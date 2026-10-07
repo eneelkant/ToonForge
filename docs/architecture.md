@@ -216,7 +216,7 @@ Max retries and cooldowns come from config. Supervisor transitions: `FAILED → 
 
 ```
 IDEA → RESEARCHING → ANALYZING → STORY_GENERATED → STORYBOARD_READY
-  → PRODUCTION → AUDIO → EDITING → QA → READY_TO_PUBLISH
+  → PRODUCTION → AUDIO → ASSEMBLY → QA → READY_TO_PUBLISH
   → SCHEDULED → PUBLISHED → ANALYZING → COMPLETE
 
 Any → FAILED → RETRYING → (previous valid state)

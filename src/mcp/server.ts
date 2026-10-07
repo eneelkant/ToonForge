@@ -116,11 +116,24 @@ export function createToonForgeMcpServer(): Server {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const name = request.params.name;
     const args = (request.params.arguments ?? {}) as Record<string, unknown>;
-    // Safety: never expose env secrets through tool results.
-    const result = await handleTool(name, args);
-    return {
-      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-    };
+    try {
+      // Safety: never expose env secrets through tool results.
+      const result = await handleTool(name, args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      const payload = {
+        error: true,
+        tool: name,
+        code: (error as { code?: string })?.code ?? "TOOL_ERROR",
+        message: error instanceof Error ? error.message : String(error),
+      };
+      return {
+        isError: true,
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+      };
+    }
   });
 
   server.setRequestHandler(ListResourcesRequestSchema, async () => ({

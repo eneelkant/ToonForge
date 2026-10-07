@@ -1,16 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createYoutubeAdapter } from "../../src/adapters/youtube/index.js";
 import type { YoutubeApiClient } from "../../src/adapters/youtube/types.js";
+import {
+  generateDevThumbnail,
+  generateDevVideo,
+  writeMediaSidecar,
+} from "../../src/core/media.js";
 
-function tmpVideo(): { dir: string; videoPath: string; thumbPath: string } {
+async function tmpMedia(): Promise<{ dir: string; videoPath: string; thumbPath: string }> {
   const dir = mkdtempSync(join(tmpdir(), "tf-yt-"));
   const videoPath = join(dir, "out.mp4");
   const thumbPath = join(dir, "thumb.jpg");
-  writeFileSync(videoPath, "fake-mp4");
-  writeFileSync(thumbPath, "fake-jpg");
+  await generateDevVideo({ outPath: videoPath, durationSec: 1, withAudio: true });
+  await generateDevThumbnail({ outPath: thumbPath });
+  writeMediaSidecar(videoPath, { kind: "ffmpeg_dev" });
+  writeMediaSidecar(thumbPath, { kind: "ffmpeg_dev" });
   return { dir, videoPath, thumbPath };
 }
 
@@ -35,7 +42,7 @@ describe("youtube adapter", () => {
   });
 
   it("dry-runs publish and is idempotent", async () => {
-    const { dir, videoPath, thumbPath } = tmpVideo();
+    const { dir, videoPath, thumbPath } = await tmpMedia();
     const dataDir = mkdtempSync(join(tmpdir(), "tf-data-"));
     const yt = createYoutubeAdapter(config, { dataDir, dryRunDefault: true });
     const req = {
@@ -67,10 +74,10 @@ describe("youtube adapter", () => {
     const manifest = await yt.getManifest("pub:p1:v1");
     expect(manifest?.projectId).toBe("p1");
     expect(dir).toBeTruthy();
-  });
+  }, 60_000);
 
   it("blocks FAIL QA and third-party footage", async () => {
-    const { videoPath } = tmpVideo();
+    const { videoPath } = await tmpMedia();
     const dataDir = mkdtempSync(join(tmpdir(), "tf-data-"));
     const yt = createYoutubeAdapter(config, { dataDir });
     await expect(
@@ -102,10 +109,12 @@ describe("youtube adapter", () => {
         },
       }),
     ).rejects.toMatchObject({ code: "POLICY_VIOLATION" });
-  });
+  }, 60_000);
 
-  it("uploads via injected API client when dryRun=false", async () => {
-    const { videoPath, thumbPath } = tmpVideo();
+  it("uploads via injected API client when dryRun=false with production media", async () => {
+    const { videoPath, thumbPath } = await tmpMedia();
+    writeMediaSidecar(videoPath, { kind: "reelmimic", provider: "reelmimic" });
+    writeMediaSidecar(thumbPath, { kind: "provider", provider: "brand" });
     const dataDir = mkdtempSync(join(tmpdir(), "tf-data-"));
     const api: YoutubeApiClient = {
       uploadVideo: vi.fn(async () => ({ youtubeId: "yt_123" })),
@@ -144,10 +153,40 @@ describe("youtube adapter", () => {
     expect(api.uploadVideo).toHaveBeenCalledOnce();
     expect(api.setThumbnail).toHaveBeenCalledOnce();
     expect(api.addToPlaylist).toHaveBeenCalledOnce();
-  });
+  }, 60_000);
+
+  it("refuses live publish of ffmpeg_dev fixtures", async () => {
+    const { videoPath, thumbPath } = await tmpMedia();
+    const dataDir = mkdtempSync(join(tmpdir(), "tf-data-"));
+    const yt = createYoutubeAdapter(config, { dataDir, dryRunDefault: false });
+    await expect(
+      yt.publish({
+        idempotencyKey: "pub:p6:v6",
+        projectId: "p6",
+        videoId: "v6",
+        videoPath,
+        dryRun: false,
+        workflowState: "READY_TO_PUBLISH",
+        qaStatus: "PASS",
+        policyStatus: "PASS",
+        metadata: {
+          title: "Dev",
+          description: "Desc",
+          privacyStatus: "private",
+          thumbnailPath: thumbPath,
+        },
+        provenance: {
+          originalContent: true,
+          thirdPartyFootage: false,
+          licensedAssets: [],
+          notes: [],
+        },
+      }),
+    ).rejects.toMatchObject({ code: "POLICY_VIOLATION" });
+  }, 60_000);
 
   it("pause blocks publishing", async () => {
-    const { videoPath } = tmpVideo();
+    const { videoPath } = await tmpMedia();
     const dataDir = mkdtempSync(join(tmpdir(), "tf-data-"));
     const yt = createYoutubeAdapter(config, { dataDir });
     await yt.pause_publishing();
@@ -161,5 +200,5 @@ describe("youtube adapter", () => {
         metadata: { title: "t", description: "d", privacyStatus: "private" },
       }),
     ).rejects.toMatchObject({ code: "POLICY_VIOLATION" });
-  });
+  }, 60_000);
 });

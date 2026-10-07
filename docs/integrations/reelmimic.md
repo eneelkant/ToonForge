@@ -36,7 +36,9 @@ python3 .claude/skills/video-clone/scripts/analyze.py <file-or-url> --out <dir>
 
 Writes `report.json` (duration, shots, pacing, audio, etc.).
 
-ToonForge uses `REELMIMIC_ROOT` to locate this script. Without it, `analyzeReference` writes a structured **stub** report for local development.
+ToonForge uses `REELMIMIC_ROOT` to locate this script. Without it, `analyzeReference` writes a structured **analysis placeholder** for local development (structure fields only — never production footage).
+
+Production video must come from a healthy ReelMimic server (`REELMIMIC_ENABLED=true`). When ReelMimic is offline, dry-run/CI uses **valid FFmpeg fixtures** marked `kind=ffmpeg_dev`. Those fixtures are **blocked** from live YouTube publish.
 
 ## Env
 

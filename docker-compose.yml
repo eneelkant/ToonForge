@@ -1,0 +1,43 @@
+# ToonForge local/production stack.
+# Secrets via env file — never bake credentials into images.
+#
+# ReelMimic and OmniChar are separate processes/services (not vendored here).
+# Point REELMIMIC_BASE_URL / OMNICHAR_BASE_URL at host or sibling containers.
+
+services:
+  toonforge:
+    build: .
+    image: toonforge:local
+    container_name: toonforge
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TOONFORGE_DATA_DIR: /data
+      TOONFORGE_LOG_LEVEL: ${TOONFORGE_LOG_LEVEL:-info}
+      TOONFORGE_KILL_SWITCH: ${TOONFORGE_KILL_SWITCH:-false}
+      YOUTUBE_DRY_RUN: ${YOUTUBE_DRY_RUN:-true}
+      OMNICHAR_ENABLED: ${OMNICHAR_ENABLED:-false}
+      OMNICHAR_BASE_URL: ${OMNICHAR_BASE_URL:-http://host.docker.internal:8848}
+      REELMIMIC_ENABLED: ${REELMIMIC_ENABLED:-false}
+      REELMIMIC_BASE_URL: ${REELMIMIC_BASE_URL:-http://host.docker.internal:4318}
+      YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID:-}
+      YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET:-}
+      YOUTUBE_TOKEN_PATH: /data/youtube-token.json
+    volumes:
+      - toonforge-data:/data
+      - toonforge-logs:/logs
+      - toonforge-generated:/generated
+      - toonforge-published:/published
+      - ./config:/app/config:ro
+      - ./characters:/app/characters:ro
+    ports:
+      - "${TOONFORGE_PORT:-3100}:3100"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  toonforge-data:
+  toonforge-logs:
+  toonforge-generated:
+  toonforge-published:

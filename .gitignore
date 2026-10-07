@@ -15,8 +15,16 @@ data/*
 !data/.gitkeep
 data/*.db
 data/*.sqlite
+projects/*
+!projects/.gitkeep
+analytics/*
+!analytics/.gitkeep
 .cache/
 tmp/
+*.mp4
+*.m4a
+*.wav
+!tests/fixtures/**
 .reelmimic/
 .inline/
 .inline-assets/
