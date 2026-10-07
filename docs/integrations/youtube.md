@@ -30,4 +30,26 @@ Use Google Cloud OAuth **Desktop** client with YouTube Data API v3 enabled.
 
 ## Idempotency
 
-Uploads must key on project/video ID. If upload outcome is unknown, require channel reconciliation before retry (pattern observed in AgentTube publishing agent).
+Uploads key on `pub:<projectId>:<videoId>`. Manifests are stored under `data/publish-manifests/`.
+Replays return the prior result without a second upload.
+
+If upload outcome is unknown (no video id), status becomes `reconciliation_required`.
+
+## Dry run
+
+Default `YOUTUBE_DRY_RUN=true` (also `dryRunDefault` on the adapter). Dry-run writes a publication
+manifest and does **not** call YouTube.
+
+## Gates
+
+Publishing requires:
+
+- workflow state `READY_TO_PUBLISH` (when provided)
+- QA not `FAIL`
+- policy not `FAIL`
+- `originalContent: true` and no `thirdPartyFootage`
+- video (and thumbnail if set) exist on disk
+
+## OAuth
+
+Desktop OAuth client + token file at `YOUTUBE_TOKEN_PATH`. Token contents are never logged.
