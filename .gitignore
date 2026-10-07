@@ -5,9 +5,14 @@ dist/
 *.log
 .DS_Store
 coverage/
-generated/
-published/
-logs/
+generated/*
+!generated/.gitkeep
+published/*
+!published/.gitkeep
+logs/*
+!logs/.gitkeep
+data/*
+!data/.gitkeep
 data/*.db
 data/*.sqlite
 .cache/
