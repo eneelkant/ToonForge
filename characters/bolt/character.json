@@ -1,0 +1,23 @@
+{
+  "character_id": "bolt",
+  "display_name": "Bolt",
+  "canonical_description": "A compact robot sidekick with a rounded yellow chassis, single expressive visor eye, and magnetic gripper hands. Loyal and slightly sarcastic.",
+  "visual_reference": "characters/bolt/visual-reference.md",
+  "omnichar_artifact": null,
+  "voice": {
+    "provider": null,
+    "voice_id": null,
+    "style_notes": "Light robotic timbre, warm not menacing"
+  },
+  "personality": ["loyal", "witty", "precise"],
+  "wardrobe": ["yellow chassis", "blue accent lights"],
+  "allowed_styles": ["cartoon", "pixel-art", "anime-cel"],
+  "consistency": {
+    "lock_face": true,
+    "lock_palette": true,
+    "max_drift_score": 10
+  },
+  "version": "1.0.0",
+  "created_at": "2026-10-07T00:00:00.000Z",
+  "updated_at": "2026-10-07T00:00:00.000Z"
+}
