@@ -7,17 +7,29 @@ import type { AgentHandle, OrchestratorAdapter, WorkflowHandle } from "./types.j
 export function createLocalOrchestrator(): OrchestratorAdapter {
   const workflows = new Map<string, WorkflowHandle>();
   const agents = new Map<string, AgentHandle>();
+  const registry = new Map<string, { role: string; registeredAt: string }>();
 
   return {
     name: "local",
     async probe(): Promise<AdapterAvailability> {
       return { status: "ready", detail: "local in-process runner" };
     },
+    async registerAgent(role: string) {
+      const agentId = newId(`agent_${role}`);
+      registry.set(agentId, { role, registeredAt: new Date().toISOString() });
+      agents.set(agentId, { agentId, status: "idle" });
+      return { agentId, status: "idle" as const };
+    },
+    listAgents() {
+      return [...agents.values()];
+    },
     workflow: {
-      async start(name) {
+      async start(name, input) {
         const handle: WorkflowHandle = {
           workflowId: newId(`wf_${name}`),
           status: "running",
+          input,
+          startedAt: new Date().toISOString(),
         };
         workflows.set(handle.workflowId, handle);
         return handle;
@@ -44,10 +56,13 @@ export function createLocalOrchestrator(): OrchestratorAdapter {
       },
     },
     agent: {
-      async dispatch(role) {
+      async dispatch(role, input) {
         const handle: AgentHandle = {
           agentId: newId(`agent_${role}`),
           status: "running",
+          role,
+          input,
+          updatedAt: new Date().toISOString(),
         };
         agents.set(handle.agentId, handle);
         return handle;

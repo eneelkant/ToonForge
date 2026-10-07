@@ -47,7 +47,7 @@ export interface RuntimeConfig {
     timeoutMs: number;
     maxRetries: number;
   };
-  ruflo: { enabled: boolean };
+  ruflo: { enabled: boolean; probeTimeoutMs: number };
   youtube: {
     clientId?: string;
     clientSecret?: string;
@@ -81,6 +81,7 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     },
     ruflo: {
       enabled: env.RUFLO_ENABLED === "true",
+      probeTimeoutMs: Number(env.RUFLO_PROBE_TIMEOUT_MS || 8000),
     },
     youtube: {
       clientId: env.YOUTUBE_CLIENT_ID,
