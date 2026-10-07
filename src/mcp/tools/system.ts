@@ -20,6 +20,7 @@ export async function getSystemStatus(config: RuntimeConfig) {
       omnichar: omnicharProbe,
       omnicharHealth,
       reelmimic: await reelmimic.probe(),
+      reelmimicHealth: await reelmimic.health(),
       youtube: await youtube.probe(),
       orchestrator: await orchestrator.probe(),
     },
@@ -29,6 +30,13 @@ export async function getSystemStatus(config: RuntimeConfig) {
         baseUrl: config.omnichar.baseUrl,
         timeoutMs: config.omnichar.timeoutMs,
         maxRetries: config.omnichar.maxRetries,
+      },
+      reelmimic: {
+        enabled: config.reelmimic.enabled,
+        baseUrl: config.reelmimic.baseUrl,
+        root: config.reelmimic.root ?? null,
+        timeoutMs: config.reelmimic.timeoutMs,
+        maxRetries: config.reelmimic.maxRetries,
       },
     },
     budgets: {

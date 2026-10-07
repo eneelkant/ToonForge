@@ -40,7 +40,13 @@ export interface RuntimeConfig {
     timeoutMs: number;
     maxRetries: number;
   };
-  reelmimic: { enabled: boolean; baseUrl: string; root?: string };
+  reelmimic: {
+    enabled: boolean;
+    baseUrl: string;
+    root?: string;
+    timeoutMs: number;
+    maxRetries: number;
+  };
   ruflo: { enabled: boolean };
   youtube: {
     clientId?: string;
@@ -69,6 +75,8 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
       enabled: env.REELMIMIC_ENABLED === "true",
       baseUrl: env.REELMIMIC_BASE_URL || "http://127.0.0.1:4318",
       root: env.REELMIMIC_ROOT,
+      timeoutMs: Number(env.REELMIMIC_TIMEOUT_MS || 30_000),
+      maxRetries: Number(env.REELMIMIC_MAX_RETRIES || 3),
     },
     ruflo: {
       enabled: env.RUFLO_ENABLED === "true",

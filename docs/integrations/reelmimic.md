@@ -3,22 +3,51 @@
 - Upstream: https://github.com/edenfunf/reelmimic
 - License: MIT (verified) + third-party notices for bundled skills
 - Adapter: `src/adapters/reelmimic/`
+- Default server: `http://127.0.0.1:4318`
 
-## Verified runtime surface
+## Setup
 
-- Install: `./install.sh`
-- Start: `./start.sh` → http://localhost:4318
-- Doctor: `cd app && npm run doctor`
-- Analysis CLI: `python analyze.py <file-or-url> --out <dir>` → `report.json`
-- HTTP project lifecycle: create / message / approve / resume / retry / cancel / events
+```bash
+git clone https://github.com/edenfunf/reelmimic.git
+cd reelmimic
+./install.sh
+./start.sh   # http://localhost:4318
+```
 
-## Mapping to ToonForge
+Requirements (upstream): Node ≥ 22.18, Python ≥ 3.10, FFmpeg, Chrome, Claude Code or Codex CLI.
 
-| ToonForge | ReelMimic |
-|-----------|-----------|
-| `reference.analyze` | `analyze.py` / analyzing stage |
-| `production.plan` | planning / plan.json / STORYBOARD.md |
-| `production.generate_*` | producing stage |
-| `production.validate_output` | critique / out/video.mp4 presence |
+## Verified HTTP API
 
-Requires operator AI CLI (Claude Code or Codex). ToonForge must fail cleanly if the server is down.
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/agents` | health / installed agent CLIs |
+| GET/POST | `/api/projects` | list / create (multipart: reference or url, brief, agent, lang) |
+| GET | `/api/projects/:id` | snapshot |
+| POST | `/api/projects/:id/approve` | approve plan |
+| POST | `/api/projects/:id/resume` · `/retry` · `/cancel` | control |
+| GET | `/api/projects/:id/events` | SSE |
+| GET | `/files/:id/*` | project files (e.g. `analysis/report.json`, `out/video.mp4`) |
+
+## Analysis CLI
+
+```bash
+python3 .claude/skills/video-clone/scripts/analyze.py <file-or-url> --out <dir>
+```
+
+Writes `report.json` (duration, shots, pacing, audio, etc.).
+
+ToonForge uses `REELMIMIC_ROOT` to locate this script. Without it, `analyzeReference` writes a structured **stub** report for local development.
+
+## Env
+
+```
+REELMIMIC_ENABLED=true
+REELMIMIC_BASE_URL=http://127.0.0.1:4318
+REELMIMIC_ROOT=/path/to/reelmimic
+REELMIMIC_TIMEOUT_MS=30000
+REELMIMIC_MAX_RETRIES=3
+```
+
+## Originality rule
+
+Reference videos are for structure/pacing analysis only. Do not feed copyrighted third-party footage into production as reusable assets. Production briefs must request **original** characters, scripts, and visuals.
