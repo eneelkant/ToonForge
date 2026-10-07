@@ -16,4 +16,18 @@ npx -y ruflo@latest mcp start
 - `workflow.start|pause|resume|cancel|status`
 - `agent.dispatch|status|retry|stop`
 
-When `RUFLO_ENABLED=false` or Ruflo is unavailable, `LocalWorkflowRunner` executes the same interfaces in-process.
+When `RUFLO_ENABLED=false` or Ruflo is unavailable, `LocalOrchestrator` executes the same interfaces in-process.
+
+## Probe
+
+`probeRufloCli()` runs `npx -y ruflo@latest --version` with timeout (`RUFLO_PROBE_TIMEOUT_MS`).
+
+If Ruflo is enabled but unreachable, ToonForge logs a warning and **continues using the local runner** so MCP/workflow APIs stay available.
+
+## Public API (stable)
+
+Callers use `createOrchestrator(config)` only — never Ruflo CLI details:
+
+- `workflow.start|pause|resume|cancel|status`
+- `agent.dispatch|status|retry|stop`
+- `registerAgent` / `listAgents` (local)
