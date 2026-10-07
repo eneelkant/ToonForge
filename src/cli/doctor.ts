@@ -7,10 +7,13 @@ import { getSystemStatus } from "../mcp/tools/system.js";
 
 const execFileAsync = promisify(execFile);
 
+type Severity = "PASS" | "WARN" | "FAIL";
+
 interface CheckResult {
   name: string;
-  ok: boolean;
+  severity: Severity;
   detail: string;
+  remediation?: string;
 }
 
 async function which(cmd: string): Promise<string | null> {
@@ -36,36 +39,46 @@ export async function runDoctor(): Promise<void> {
   const nodePath = await which("node");
   checks.push({
     name: "node",
-    ok: Boolean(nodePath),
-    detail: nodePath ? await version("node", ["-v"]) : "not found (need >= 22.18)",
+    severity: nodePath ? "PASS" : "FAIL",
+    detail: nodePath ? await version("node", ["-v"]) : "not found",
+    remediation: "Install Node.js >= 22.14",
   });
 
   const python = await which("python3");
   checks.push({
     name: "python3",
-    ok: Boolean(python),
+    severity: python ? "PASS" : "WARN",
     detail: python ? await version("python3", ["--version"]) : "not found",
+    remediation: "Needed for ReelMimic analyze.py / OmniChar",
   });
 
   const ffmpeg = await which("ffmpeg");
   checks.push({
     name: "ffmpeg",
-    ok: Boolean(ffmpeg),
+    severity: ffmpeg ? "PASS" : "WARN",
     detail: ffmpeg ? await version("ffmpeg", ["-version"]) : "not found",
+    remediation: "Install FFmpeg for media validation/production",
   });
 
   const git = await which("git");
   checks.push({
     name: "git",
-    ok: Boolean(git),
+    severity: git ? "PASS" : "WARN",
     detail: git ? await version("git", ["--version"]) : "not found",
   });
 
   const gh = await which("gh");
   checks.push({
     name: "gh",
-    ok: Boolean(gh),
+    severity: gh ? "PASS" : "WARN",
     detail: gh ? await version("gh", ["--version"]) : "optional; not found",
+  });
+
+  const docker = await which("docker");
+  checks.push({
+    name: "docker",
+    severity: docker ? "PASS" : "WARN",
+    detail: docker ? await version("docker", ["--version"]) : "optional; not found",
   });
 
   const writableDirs = ["data", "logs", "generated", "published", "projects", "analytics"];
@@ -73,12 +86,13 @@ export async function runDoctor(): Promise<void> {
     const abs = resolve(dir);
     try {
       await access(abs, constants.W_OK);
-      checks.push({ name: `writable:${dir}`, ok: true, detail: abs });
+      checks.push({ name: `writable:${dir}`, severity: "PASS", detail: abs });
     } catch {
       checks.push({
         name: `writable:${dir}`,
-        ok: false,
-        detail: `${abs} missing or not writable (create with mkdir -p)`,
+        severity: "FAIL",
+        detail: `${abs} missing or not writable`,
+        remediation: `mkdir -p ${dir}`,
       });
     }
   }
@@ -87,37 +101,49 @@ export async function runDoctor(): Promise<void> {
   const status = await getSystemStatus(config);
   checks.push({
     name: "kill_switch",
-    ok: !status.killSwitch,
-    detail: status.killSwitch ? "ENABLED — all irreversible work blocked" : "disabled",
+    severity: status.killSwitch ? "FAIL" : "PASS",
+    detail: status.killSwitch ? "ENABLED — irreversible work blocked" : "disabled",
+    remediation: "Set TOONFORGE_KILL_SWITCH=false to resume",
   });
+
+  const adapterSeverity = (s: string): Severity =>
+    s === "ready" ? "PASS" : s === "disabled" ? "WARN" : "WARN";
+
   checks.push({
     name: "adapter:omnichar",
-    ok: true,
+    severity: adapterSeverity(status.adapters.omnichar.status),
     detail: JSON.stringify(status.adapters.omnichar),
+    remediation: "Install OmniChar and set OMNICHAR_ENABLED=true",
   });
   checks.push({
     name: "adapter:reelmimic",
-    ok: true,
+    severity: adapterSeverity(status.adapters.reelmimic.status),
     detail: JSON.stringify(status.adapters.reelmimic),
+    remediation: "Install ReelMimic and set REELMIMIC_ENABLED=true",
   });
   checks.push({
     name: "adapter:youtube",
-    ok: true,
+    severity: status.adapters.youtube.status === "ready" ? "PASS" : "WARN",
     detail: JSON.stringify(status.adapters.youtube),
+    remediation: "Configure YOUTUBE_CLIENT_ID/SECRET and OAuth token",
   });
   checks.push({
     name: "adapter:orchestrator",
-    ok: status.adapters.orchestrator.status === "ready",
+    severity: status.adapters.orchestrator.status === "ready" ? "PASS" : "WARN",
     detail: JSON.stringify(status.adapters.orchestrator),
   });
 
-  const failed = checks.filter((c) => !c.ok && !c.name.startsWith("adapter:"));
+  let fail = 0;
+  let warn = 0;
   for (const c of checks) {
-    console.log(`${c.ok ? "OK" : "FAIL"}  ${c.name}: ${c.detail}`);
+    console.log(`${c.severity.padEnd(4)} ${c.name}: ${c.detail}`);
+    if (c.severity === "FAIL" && c.remediation) console.log(`      → ${c.remediation}`);
+    if (c.severity === "WARN" && c.remediation) console.log(`      → ${c.remediation}`);
+    if (c.severity === "FAIL") fail += 1;
+    if (c.severity === "WARN") warn += 1;
   }
-  if (failed.length > 0) {
-    process.exitCode = 1;
-  }
+  console.log(`SUMMARY fail=${fail} warn=${warn} pass=${checks.length - fail - warn}`);
+  if (fail > 0) process.exitCode = 1;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
