@@ -39,6 +39,13 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (cmd === "reelmimic" && sub === "health") {
+    const { createReelMimicAdapter } = await import("../adapters/reelmimic/index.js");
+    const adapter = createReelMimicAdapter(config.reelmimic);
+    console.log(JSON.stringify(await adapter.health(), null, 2));
+    return;
+  }
+
   if (cmd === "system" && sub === "status") {
     console.log(JSON.stringify(await getSystemStatus(config), null, 2));
     return;
@@ -93,6 +100,7 @@ Commands:
   characters list
   omnichar health
   omnichar list
+  reelmimic health
   system status
   config channel [path]
   workflow start [name]
