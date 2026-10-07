@@ -7,6 +7,8 @@ import { defaultCharacterRegistry } from "../../characters/registry.js";
 import { ManualSeedTrendProvider, dedupeTrends, selectOpportunity } from "../trend/index.js";
 import { generateOriginalStory, validateStory } from "../story/index.js";
 import { createStoryboard } from "../storyboard/index.js";
+import { buildContinuityPlan, persistContinuityPlan, validateContinuityPlan } from "../continuity/index.js";
+import { createOmniCharAdapter } from "../../adapters/omnichar/index.js";
 import { produceLocalCartoon } from "../production/index.js";
 import { generateAudioBundle } from "../audio/index.js";
 import { buildContentPackage } from "../packaging/index.js";
@@ -100,6 +102,25 @@ export async function runDailyWorkflow(opts: {
     record = advance(record, "STORYBOARD_READY");
     const storyboard = createStoryboard(story);
     writeFileSync(join(projectDir, "storyboard.json"), JSON.stringify(storyboard, null, 2));
+    const continuity = await buildContinuityPlan({
+      projectId,
+      characters,
+      storyboard,
+      omnichar: config.omnichar.enabled ? createOmniCharAdapter(config.omnichar) : null,
+    });
+    persistContinuityPlan(projectDir, continuity);
+    const continuityCheck = validateContinuityPlan({
+      ...continuity,
+      pins: continuity.pins.map((p) => ({
+        ...p,
+        // Local registry pins are authoritative when OmniChar is offline.
+        continuity_ok: config.omnichar.enabled ? p.continuity_ok : true,
+        detail: config.omnichar.enabled ? p.detail : "local registry pin (OmniChar disabled)",
+      })),
+    });
+    if (!continuityCheck.ok) {
+      throw new Error(`Continuity failed: ${continuityCheck.errors.join(", ")}`);
+    }
 
     record = advance(record, "PRODUCTION");
     const production = produceLocalCartoon({ projectId, projectDir, story, storyboard });
