@@ -10,8 +10,8 @@ import { ToonForgeError } from "../../src/core/errors.js";
 import { loadChannelConfig } from "../../src/core/config.js";
 
 describe("trend provider factory", () => {
-  it("registers manual / manual-seed", () => {
-    expect(listRegisteredTrendSourceNames()).toEqual(["manual", "manual-seed"]);
+  it("registers manual / manual-seed / youtube", () => {
+    expect(listRegisteredTrendSourceNames()).toEqual(["manual", "manual-seed", "youtube"]);
   });
 
   it("creates ManualSeedTrendProvider from channel trend_sources", async () => {

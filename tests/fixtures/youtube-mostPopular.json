@@ -1,0 +1,63 @@
+{
+  "kind": "youtube#videoListResponse",
+  "items": [
+    {
+      "id": "synthVideo001",
+      "snippet": {
+        "publishedAt": "2026-10-06T12:00:00Z",
+        "channelId": "UCsyntheticChannel01",
+        "title": "Kids cartoon friendship problem solving adventure short",
+        "description": "Synthetic fixture video description for ToonForge unit tests. Original kids cartoon niche.",
+        "channelTitle": "Synthetic Kids Channel",
+        "categoryId": "1",
+        "tags": ["cartoon", "kids", "friendship"]
+      },
+      "contentDetails": {
+        "duration": "PT45S"
+      },
+      "statistics": {
+        "viewCount": "125000",
+        "likeCount": "8200",
+        "commentCount": "640"
+      }
+    },
+    {
+      "id": "synthVideo002",
+      "snippet": {
+        "publishedAt": "2026-10-01T08:00:00Z",
+        "channelId": "UCsyntheticChannel02",
+        "title": "Inventor kid vs tiny robot mishap comedy",
+        "description": "Synthetic inventor short for fixture scoring.",
+        "channelTitle": "Synthetic Inventor Lab",
+        "categoryId": "1"
+      },
+      "contentDetails": {
+        "duration": "PT1M10S"
+      },
+      "statistics": {
+        "viewCount": "54000",
+        "likeCount": "2100",
+        "commentCount": "180"
+      }
+    },
+    {
+      "id": "synthVideo003",
+      "snippet": {
+        "publishedAt": "2026-09-20T18:30:00Z",
+        "channelId": "UCsyntheticChannel03",
+        "title": "Official music video full song lyrics",
+        "description": "Synthetic high-risk entertainment packaging fixture.",
+        "channelTitle": "Synthetic Music Dump",
+        "categoryId": "10"
+      },
+      "contentDetails": {
+        "duration": "PT3M20S"
+      },
+      "statistics": {
+        "viewCount": "9000000",
+        "likeCount": "120000",
+        "commentCount": "9000"
+      }
+    }
+  ]
+}
