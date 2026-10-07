@@ -18,9 +18,12 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "doctor": "node --import tsx src/cli/doctor.ts",
     "cli": "node --import tsx src/cli/index.ts",
+    "mcp": "node --import tsx src/mcp/server.ts",
+    "workflow:daily": "node --import tsx src/cli/index.ts workflow run daily",
     "format:check": "node -e \"console.log('format:check placeholder — prettier not required yet')\""
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "googleapis": "^148.0.0",
     "yaml": "^2.8.0",
     "zod": "^3.25.76"

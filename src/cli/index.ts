@@ -70,6 +70,19 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (cmd === "workflow" && sub === "run" && rest[0] === "daily") {
+    const { runDailyWorkflow } = await import("../engines/workflow/daily.js");
+    const dryRun = !rest.includes("--publish");
+    console.log(JSON.stringify(await runDailyWorkflow({ dryRun }), null, 2));
+    return;
+  }
+
+  if (cmd === "mcp") {
+    const { startMcpStdio } = await import("../mcp/server.js");
+    await startMcpStdio();
+    return;
+  }
+
   if (cmd === "config" && sub === "channel") {
     const path = rest[0] || "config/channels/cartoon-default.yaml";
     console.log(JSON.stringify(loadChannelConfig(path), null, 2));
@@ -104,7 +117,9 @@ Commands:
   system status
   config channel [path]
   workflow start [name]
+  workflow run daily [--publish]
   workflow status <id>
+  mcp
   pause
   resume
   help
