@@ -7,10 +7,10 @@ import { createYoutubeAdapter } from "../adapters/youtube/index.js";
 import { createOrchestrator } from "../adapters/ruflo/index.js";
 import { createOmniCharAdapter } from "../adapters/omnichar/index.js";
 import {
-  ManualSeedTrendProvider,
-  dedupeTrends,
+  discoverTrendsForChannel,
   scoreTrend,
 } from "../engines/trend/index.js";
+import type { PipelineMode } from "../engines/reference/index.js";
 import { generateOriginalStory, validateStory } from "../engines/story/index.js";
 import { createStoryboard } from "../engines/storyboard/index.js";
 import { produceCartoon } from "../engines/production/index.js";
@@ -49,8 +49,12 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
     }
     case "toonforge.discover_trends": {
       const channel = loadChannelConfig(String(args.channelPath ?? "config/channels/cartoon-default.yaml"));
-      const provider = new ManualSeedTrendProvider();
-      return dedupeTrends(await provider.discover({ niche: channel.niche, limit: Number(args.limit ?? 5) }));
+      const { trends, providers } = await discoverTrendsForChannel({
+        trendSources: channel.trend_sources,
+        niche: channel.niche,
+        limit: Number(args.limit ?? 5),
+      });
+      return { providers, trends, trend_sources: channel.trend_sources };
     }
     case "toonforge.score_trends": {
       const trends = (args.trends as Array<Record<string, number>>) ?? [];
@@ -114,13 +118,19 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
       const projectId = String(args.projectId ?? newId("proj"));
       const projectDir = String(args.projectDir ?? join(config.dataDir, "projects", projectId));
       mkdirSync(projectDir, { recursive: true });
+      const mode: PipelineMode =
+        args.pipelineMode === "reelmimic" || (config.reelmimic.enabled && args.pipelineMode !== "offline_fixture")
+          ? "reelmimic"
+          : "offline_fixture";
       return produceCartoon({
         projectId,
         projectDir,
         story: args.story as never,
         storyboard: args.storyboard as never,
-        reelmimic: config.reelmimic.enabled ? createReelMimicAdapter(config.reelmimic) : null,
-        allowDevFixture: true,
+        reelmimic: mode === "reelmimic" ? createReelMimicAdapter(config.reelmimic) : null,
+        mode,
+        referencePath: args.referencePath ? String(args.referencePath) : undefined,
+        referenceUrl: args.referenceUrl ? String(args.referenceUrl) : undefined,
       });
     }
     case "toonforge.generate_voice":
@@ -183,6 +193,12 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
       return runDailyWorkflow({
         channelPath: args.channelPath ? String(args.channelPath) : undefined,
         dryRun: args.dryRun !== false,
+        pipelineMode:
+          args.pipelineMode === "reelmimic" || args.pipelineMode === "offline_fixture"
+            ? (args.pipelineMode as PipelineMode)
+            : undefined,
+        referencePath: args.referencePath ? String(args.referencePath) : undefined,
+        referenceUrl: args.referenceUrl ? String(args.referenceUrl) : undefined,
       });
     case "toonforge.get_workflow_status": {
       const orch = createOrchestrator(config.ruflo);

@@ -9,11 +9,18 @@ describe("MCP handlers", () => {
     expect(listPrompts().length).toBeGreaterThan(0);
   });
 
-  it("lists characters and discovers trends", async () => {
+  it("lists characters and discovers trends via channel trend_sources", async () => {
     const chars = await handleTool("toonforge.list_characters", {});
     expect(Array.isArray(chars)).toBe(true);
-    const trends = await handleTool("toonforge.discover_trends", { limit: 2 });
-    expect(Array.isArray(trends)).toBe(true);
+    const result = (await handleTool("toonforge.discover_trends", { limit: 2 })) as {
+      providers: string[];
+      trends: unknown[];
+      trend_sources: string[];
+    };
+    expect(result.trend_sources).toContain("manual");
+    expect(result.providers).toContain("manual");
+    expect(Array.isArray(result.trends)).toBe(true);
+    expect(result.trends.length).toBeGreaterThan(0);
   });
 
   it("pause blocks non-status tools", async () => {
@@ -21,7 +28,9 @@ describe("MCP handlers", () => {
     const blocked = await handleTool("toonforge.discover_trends", {});
     expect(blocked).toMatchObject({ code: "PAUSED" });
     await handleTool("toonforge.resume", {});
-    const ok = await handleTool("toonforge.discover_trends", { limit: 1 });
-    expect(Array.isArray(ok)).toBe(true);
+    const ok = (await handleTool("toonforge.discover_trends", { limit: 1 })) as {
+      trends: unknown[];
+    };
+    expect(Array.isArray(ok.trends)).toBe(true);
   });
 });
