@@ -53,11 +53,18 @@ export async function runDoctor(): Promise<void> {
   });
 
   const ffmpeg = await which("ffmpeg");
+  const ffprobeBin = await which("ffprobe");
   checks.push({
     name: "ffmpeg",
-    severity: ffmpeg ? "PASS" : "WARN",
+    severity: ffmpeg ? "PASS" : "FAIL",
     detail: ffmpeg ? await version("ffmpeg", ["-version"]) : "not found",
-    remediation: "Install FFmpeg for media validation/production",
+    remediation: "Install FFmpeg — required for media generation and validation",
+  });
+  checks.push({
+    name: "ffprobe",
+    severity: ffprobeBin ? "PASS" : "FAIL",
+    detail: ffprobeBin ? await version("ffprobe", ["-version"]) : "not found",
+    remediation: "Install ffprobe (usually bundled with FFmpeg)",
   });
 
   const git = await which("git");

@@ -26,6 +26,8 @@ export interface YoutubeUploadRequest {
   policyStatus?: "PASS" | "FAIL";
   dryRun?: boolean;
   provenance?: PublicationManifest["provenance"];
+  /** Full provenance record for live-publish fail-closed checks. */
+  fullProvenance?: unknown;
 }
 
 export interface YoutubeUploadResult {

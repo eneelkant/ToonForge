@@ -13,7 +13,7 @@ import {
 } from "../engines/trend/index.js";
 import { generateOriginalStory, validateStory } from "../engines/story/index.js";
 import { createStoryboard } from "../engines/storyboard/index.js";
-import { produceLocalCartoon } from "../engines/production/index.js";
+import { produceCartoon } from "../engines/production/index.js";
 import { generateAudioBundle } from "../engines/audio/index.js";
 import { buildContentPackage } from "../engines/packaging/index.js";
 import { runQa } from "../engines/qa/index.js";
@@ -114,11 +114,13 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
       const projectId = String(args.projectId ?? newId("proj"));
       const projectDir = String(args.projectDir ?? join(config.dataDir, "projects", projectId));
       mkdirSync(projectDir, { recursive: true });
-      return produceLocalCartoon({
+      return produceCartoon({
         projectId,
         projectDir,
         story: args.story as never,
         storyboard: args.storyboard as never,
+        reelmimic: config.reelmimic.enabled ? createReelMimicAdapter(config.reelmimic) : null,
+        allowDevFixture: true,
       });
     }
     case "toonforge.generate_voice":
@@ -138,7 +140,17 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
     }
     case "toonforge.run_qa":
     case "toonforge.review_video":
-      return runQa(args as never);
+      return runQa({
+        videoPath: args.videoPath ? String(args.videoPath) : undefined,
+        audioPath: args.audioPath ? String(args.audioPath) : undefined,
+        captionsPath: args.captionsPath ? String(args.captionsPath) : undefined,
+        thumbnailPath: args.thumbnailPath ? String(args.thumbnailPath) : undefined,
+        metadata: args.metadata as { title?: string; description?: string } | undefined,
+        storyComplete: args.storyComplete !== false,
+        originalContent: args.originalContent !== false,
+        thirdPartyFootage: Boolean(args.thirdPartyFootage),
+        allowDevFixtures: args.allowDevFixtures !== false,
+      });
     case "toonforge.prepare_publish":
     case "toonforge.schedule_publish":
     case "toonforge.publish_video": {

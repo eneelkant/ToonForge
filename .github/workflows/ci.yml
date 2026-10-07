@@ -14,9 +14,30 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Install
         run: npm ci
       - name: Typecheck
         run: npm run typecheck
+      - name: Build
+        run: npm run build
       - name: Test
         run: npm test
+      - name: Media smoke
+        run: |
+          mkdir -p /tmp/tf-ci-media
+          ffmpeg -y -hide_banner -loglevel error \
+            -f lavfi -i color=c=blue:s=640x360:d=1:r=24 \
+            -f lavfi -i sine=frequency=440:duration=1 \
+            -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest \
+            /tmp/tf-ci-media/smoke.mp4
+          ffprobe -v error -show_entries format=duration -of csv=p=0 /tmp/tf-ci-media/smoke.mp4 | grep -E '^[0-9]'
+          node --import tsx -e "
+            import { validateVideo } from './src/core/media.ts';
+            const r = await validateVideo('/tmp/tf-ci-media/smoke.mp4', { requireAudio: true, minDurationSec: 0.5 });
+            if (!r.ok) { console.error(r); process.exit(1); }
+            console.log('media smoke ok', r.durationSec);
+          "
+      - name: Doctor
+        run: npm run doctor

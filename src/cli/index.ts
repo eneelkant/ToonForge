@@ -72,8 +72,15 @@ async function main(): Promise<void> {
 
   if (cmd === "workflow" && sub === "run" && rest[0] === "daily") {
     const { runDailyWorkflow } = await import("../engines/workflow/daily.js");
-    const dryRun = !rest.includes("--publish");
-    console.log(JSON.stringify(await runDailyWorkflow({ dryRun }), null, 2));
+    const publishFlag = rest.includes("--publish");
+    // Live upload only when --publish AND YOUTUBE_DRY_RUN=false (config.youtube.dryRunDefault).
+    const dryRun = publishFlag ? config.youtube.dryRunDefault : true;
+    if (publishFlag && dryRun) {
+      console.error(
+        "NOTE: --publish requested but YOUTUBE_DRY_RUN is not false; running dry-run publish only.",
+      );
+    }
+    console.log(JSON.stringify(await runDailyWorkflow({ dryRun, publish: publishFlag }), null, 2));
     return;
   }
 

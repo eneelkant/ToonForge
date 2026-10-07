@@ -13,5 +13,6 @@ describe("daily workflow dry-run", () => {
     expect(result.dryRun).toBe(true);
     expect(result.qa.verdict).not.toBe("FAIL");
     expect(result.artifacts.videoPath).toBeTruthy();
-  }, 30_000);
+    expect(result.qa.verdict).toBe("PASS");
+  }, 120_000);
 });

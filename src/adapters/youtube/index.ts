@@ -92,9 +92,17 @@ export function createYoutubeAdapter(
       });
     }
 
-    assertPublishable({ ...req, idempotencyKey });
-
     const dryRun = req.dryRun ?? dryRunDefault;
+    await assertPublishable({ ...req, idempotencyKey, dryRun });
+
+    if (!dryRun && (!config.clientId || !config.clientSecret)) {
+      throw new ToonForgeError({
+        code: "CONFIG_INVALID",
+        message: "Live YouTube publish requires YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET",
+        component: "adapters.youtube",
+      });
+    }
+
     const manifest: PublicationManifest = {
       projectId: req.projectId,
       videoId: req.videoId,

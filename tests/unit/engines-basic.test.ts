@@ -4,6 +4,7 @@ import { generateOriginalStory, validateStory } from "../../src/engines/story/in
 import { createStoryboard, regenerateShot } from "../../src/engines/storyboard/index.js";
 import { runQa } from "../../src/engines/qa/index.js";
 import { FileCharacterRegistry } from "../../src/characters/registry.js";
+import { generateDevThumbnail, generateDevVideo, writeMediaSidecar } from "../../src/core/media.js";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,20 +36,20 @@ describe("engines basics", () => {
     expect(updated.shots[0]!.visual).toBe("new framing");
   });
 
-  it("QA fails without artifacts", () => {
-    const report = runQa({ storyComplete: true, originalContent: true, thirdPartyFootage: false });
+  it("QA fails without artifacts", async () => {
+    const report = await runQa({ storyComplete: true, originalContent: true, thirdPartyFootage: false });
     expect(report.verdict).toBe("FAIL");
   });
 
-  it("QA passes with files in dry stub mode", () => {
+  it("QA fails text-placeholder stub videos even in dry-run", async () => {
     const dir = mkdtempSync(join(tmpdir(), "tf-qa-"));
     const video = join(dir, "v.mp4");
     const cap = join(dir, "c.vtt");
     const thumb = join(dir, "t.jpg");
     writeFileSync(video, "TOONFORGE_LOCAL_RENDER");
-    writeFileSync(cap, "WEBVTT");
-    writeFileSync(thumb, "x");
-    const report = runQa({
+    writeFileSync(cap, "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nhi\n");
+    writeFileSync(thumb, "THUMB:x");
+    const report = await runQa({
       videoPath: video,
       captionsPath: cap,
       thumbnailPath: thumb,
@@ -56,8 +57,32 @@ describe("engines basics", () => {
       storyComplete: true,
       originalContent: true,
       thirdPartyFootage: false,
-      allowStubVideo: true,
+      allowDevFixtures: true,
     });
-    expect(["PASS", "WARN"]).toContain(report.verdict);
+    expect(report.verdict).toBe("FAIL");
+    expect(report.checks.some((c) => c.id === "media.video" && c.verdict === "FAIL")).toBe(true);
   });
+
+  it("QA passes with real FFmpeg fixtures in dry-run", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "tf-qa-real-"));
+    const video = join(dir, "v.mp4");
+    const cap = join(dir, "c.vtt");
+    const thumb = join(dir, "t.jpg");
+    await generateDevVideo({ outPath: video, durationSec: 1, withAudio: true });
+    writeMediaSidecar(video, { kind: "ffmpeg_dev" });
+    await generateDevThumbnail({ outPath: thumb });
+    writeMediaSidecar(thumb, { kind: "ffmpeg_dev" });
+    writeFileSync(cap, "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nhi\n");
+    const report = await runQa({
+      videoPath: video,
+      captionsPath: cap,
+      thumbnailPath: thumb,
+      metadata: { title: "t", description: "d" },
+      storyComplete: true,
+      originalContent: true,
+      thirdPartyFootage: false,
+      allowDevFixtures: true,
+    });
+    expect(report.verdict).toBe("PASS");
+  }, 60_000);
 });
