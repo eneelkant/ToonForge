@@ -122,6 +122,7 @@ export async function runDailyWorkflow(opts: {
       trendSources: channel.trend_sources,
       niche: channel.niche,
       limit: 5,
+      providerOptions: { youtubeTrends: config.youtubeTrends, niche: channel.niche },
     });
     writeFileSync(
       join(projectDir, "trends.json"),

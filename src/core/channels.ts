@@ -5,6 +5,8 @@ import { loadChannelConfig, type ChannelConfig } from "./config.js";
 export function listChannelConfigs(dir = "config/channels"): ChannelConfig[] {
   return readdirSync(dir)
     .filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"))
+    // Example/docs configs (*.example.yaml) are not active channels.
+    .filter((f) => !f.includes(".example."))
     .map((f) => loadChannelConfig(join(dir, f)));
 }
 

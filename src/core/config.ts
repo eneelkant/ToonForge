@@ -56,6 +56,16 @@ export interface RuntimeConfig {
     defaultPrivacy: "private" | "unlisted" | "public";
     dryRunDefault: boolean;
   };
+  /** Read-only YouTube Data API key for trend discovery (separate from OAuth publish). */
+  youtubeTrends: {
+    enabled: boolean;
+    apiKey?: string;
+    regionCode: string;
+    categoryId?: string;
+    maxResults: number;
+    timeoutMs: number;
+    maxRetries: number;
+  };
 }
 
 export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig {
@@ -90,6 +100,15 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
       tokenPath: env.YOUTUBE_TOKEN_PATH || "./data/youtube-token.json",
       defaultPrivacy: (env.DEFAULT_PRIVACY_STATUS as RuntimeConfig["youtube"]["defaultPrivacy"]) || "private",
       dryRunDefault: env.YOUTUBE_DRY_RUN !== "false",
+    },
+    youtubeTrends: {
+      enabled: env.TOONFORGE_YOUTUBE_TRENDS_ENABLED === "true",
+      apiKey: env.YOUTUBE_DATA_API_KEY || undefined,
+      regionCode: env.YOUTUBE_TRENDS_REGION || "US",
+      categoryId: env.YOUTUBE_TRENDS_CATEGORY_ID || undefined,
+      maxResults: Number(env.YOUTUBE_TRENDS_MAX_RESULTS || 25),
+      timeoutMs: Number(env.YOUTUBE_TRENDS_TIMEOUT_MS || 15_000),
+      maxRetries: Number(env.YOUTUBE_TRENDS_MAX_RETRIES || 3),
     },
   };
 }

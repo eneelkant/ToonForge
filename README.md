@@ -37,7 +37,8 @@ Reference videos may inspire **structure** (hook, pacing, shot rhythm). They mus
 | Characters | [OmniChar](https://github.com/omnichar/OmniChar) | GPL — process/HTTP isolation only (`:8848`) |
 | Production | [ReelMimic](https://github.com/edenfunf/reelmimic) | MIT — local HTTP (`:4318`) + file contract |
 | Guidance | Karpathy-skills concepts | Mapped into ToonForge-owned policies |
-| YouTube | OAuth Data API adapter | Dry-run by default; idempotent manifests |
+| YouTube publish | OAuth Data API adapter | Dry-run by default; idempotent manifests |
+| YouTube trends | Data API key (`chart=mostPopular`) | Optional live `trend_sources: [youtube]` — see docs |
 | Orchestration | [Ruflo](https://github.com/ruvnet/ruflo) | Optional; local orchestrator fallback |
 
 ## Media kinds

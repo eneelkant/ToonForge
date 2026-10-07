@@ -92,6 +92,7 @@ export function topicFingerprint(topic: string): string {
 /**
  * Documented trend_sources values for channel YAML.
  * - manual / manual-seed: deterministic offline seeds (default)
- * Future live providers must be registered explicitly; unknown names fail closed.
+ * - youtube: official YouTube Data API v3 mostPopular (requires API key)
+ * Unknown names fail closed.
  */
-export const DOCUMENTED_TREND_SOURCES = ["manual", "manual-seed"] as const;
+export const DOCUMENTED_TREND_SOURCES = ["manual", "manual-seed", "youtube"] as const;

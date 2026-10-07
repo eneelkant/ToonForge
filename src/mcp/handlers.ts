@@ -53,6 +53,7 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
         trendSources: channel.trend_sources,
         niche: channel.niche,
         limit: Number(args.limit ?? 5),
+        providerOptions: { youtubeTrends: config.youtubeTrends, niche: channel.niche },
       });
       return { providers, trends, trend_sources: channel.trend_sources };
     }

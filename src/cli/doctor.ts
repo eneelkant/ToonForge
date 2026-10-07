@@ -140,6 +140,29 @@ export async function runDoctor(): Promise<void> {
     detail: JSON.stringify(status.adapters.orchestrator),
   });
 
+  const ytTrends = config.youtubeTrends;
+  if (!ytTrends.enabled) {
+    checks.push({
+      name: "provider:youtube-trends",
+      severity: "WARN",
+      detail: "disabled (TOONFORGE_YOUTUBE_TRENDS_ENABLED is not true)",
+      remediation: "Set TOONFORGE_YOUTUBE_TRENDS_ENABLED=true and YOUTUBE_DATA_API_KEY for live trends",
+    });
+  } else if (!ytTrends.apiKey) {
+    checks.push({
+      name: "provider:youtube-trends",
+      severity: "WARN",
+      detail: "enabled but YOUTUBE_DATA_API_KEY is not configured",
+      remediation: "Set YOUTUBE_DATA_API_KEY (Data API key — separate from OAuth publish credentials)",
+    });
+  } else {
+    checks.push({
+      name: "provider:youtube-trends",
+      severity: "PASS",
+      detail: `configured region=${ytTrends.regionCode} maxResults=${ytTrends.maxResults} key=present`,
+    });
+  }
+
   let fail = 0;
   let warn = 0;
   for (const c of checks) {

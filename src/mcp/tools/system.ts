@@ -38,6 +38,13 @@ export async function getSystemStatus(config: RuntimeConfig) {
         timeoutMs: config.reelmimic.timeoutMs,
         maxRetries: config.reelmimic.maxRetries,
       },
+      youtubeTrends: {
+        enabled: config.youtubeTrends.enabled,
+        regionCode: config.youtubeTrends.regionCode,
+        categoryId: config.youtubeTrends.categoryId ?? null,
+        maxResults: config.youtubeTrends.maxResults,
+        apiKeyConfigured: Boolean(config.youtubeTrends.apiKey),
+      },
     },
     budgets: {
       dailyBudgetUsd: config.dailyBudgetUsd,
