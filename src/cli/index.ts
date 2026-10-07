@@ -1,0 +1,93 @@
+#!/usr/bin/env node
+import { loadChannelConfig, loadRuntimeConfig } from "../core/config.js";
+import { defaultCharacterRegistry } from "../characters/registry.js";
+import { getSystemStatus } from "../mcp/tools/system.js";
+import { createOrchestrator } from "../adapters/ruflo/index.js";
+import { runDoctor } from "./doctor.js";
+
+async function main(): Promise<void> {
+  const [cmd, sub, ...rest] = process.argv.slice(2);
+  const config = loadRuntimeConfig();
+
+  if (!cmd || cmd === "help" || cmd === "--help") {
+    printHelp();
+    return;
+  }
+
+  if (cmd === "doctor") {
+    await runDoctor();
+    return;
+  }
+
+  if (cmd === "characters" && sub === "list") {
+    const chars = await defaultCharacterRegistry().list();
+    console.log(JSON.stringify(chars.map((c) => ({ id: c.character_id, name: c.display_name })), null, 2));
+    return;
+  }
+
+  if (cmd === "system" && sub === "status") {
+    console.log(JSON.stringify(await getSystemStatus(config), null, 2));
+    return;
+  }
+
+  if (cmd === "workflow" && sub === "status") {
+    const id = rest[0];
+    if (!id) {
+      console.error("usage: toonforge workflow status <id>");
+      process.exitCode = 1;
+      return;
+    }
+    const orch = createOrchestrator(config.ruflo);
+    console.log(JSON.stringify(await orch.workflow.status(id), null, 2));
+    return;
+  }
+
+  if (cmd === "workflow" && sub === "start") {
+    const name = rest[0] || "daily";
+    const orch = createOrchestrator(config.ruflo);
+    console.log(JSON.stringify(await orch.workflow.start(name), null, 2));
+    return;
+  }
+
+  if (cmd === "config" && sub === "channel") {
+    const path = rest[0] || "config/channels/cartoon-default.yaml";
+    console.log(JSON.stringify(loadChannelConfig(path), null, 2));
+    return;
+  }
+
+  if (cmd === "pause" || cmd === "resume") {
+    console.log(
+      JSON.stringify({
+        ok: true,
+        note: `${cmd} is foundation-level; set TOONFORGE_KILL_SWITCH=true/false for hard stop`,
+        killSwitch: config.killSwitch,
+      }),
+    );
+    return;
+  }
+
+  console.error(`Unknown command: ${cmd} ${sub ?? ""}`.trim());
+  printHelp();
+  process.exitCode = 1;
+}
+
+function printHelp(): void {
+  console.log(`toonforge <command>
+
+Commands:
+  doctor
+  characters list
+  system status
+  config channel [path]
+  workflow start [name]
+  workflow status <id>
+  pause
+  resume
+  help
+`);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

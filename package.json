@@ -1,0 +1,33 @@
+{
+  "name": "toonforge",
+  "version": "0.1.0",
+  "description": "Local-first autonomous YouTube cartoon generation platform",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "bin": {
+    "toonforge": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "doctor": "node --import tsx src/cli/doctor.ts",
+    "cli": "node --import tsx src/cli/index.ts",
+    "format:check": "node -e \"console.log('format:check placeholder — prettier not required yet')\""
+  },
+  "dependencies": {
+    "yaml": "^2.8.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,21 @@
+channel_id: cartoon-default
+channel_name: ToonForge Cartoon Default
+niche: original kids cartoon shorts
+format: shorts
+schedule:
+  timezone: UTC
+  cron: "0 6 * * *"
+  enabled: false
+characters:
+  - max
+  - bolt
+  - milo
+style: cartoon
+duration_seconds: 45
+max_daily_videos: 1
+approval_mode: manual
+publishing_mode: schedule
+trend_sources:
+  - manual
+quality_threshold: 0.7
+risk_threshold: 0.3

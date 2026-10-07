@@ -1,0 +1,23 @@
+{
+  "character_id": "milo",
+  "display_name": "Milo",
+  "canonical_description": "A gentle cartoon fox storyteller with cream-and-rust fur, a soft green scarf, and sketchbook satchel. Calm narrator energy.",
+  "visual_reference": "characters/milo/visual-reference.md",
+  "omnichar_artifact": null,
+  "voice": {
+    "provider": null,
+    "voice_id": null,
+    "style_notes": "Warm, measured, storybook narrator"
+  },
+  "personality": ["wise", "kind", "observant"],
+  "wardrobe": ["green scarf", "brown satchel"],
+  "allowed_styles": ["cartoon", "crayon-storybook", "watercolor"],
+  "consistency": {
+    "lock_face": true,
+    "lock_palette": true,
+    "max_drift_score": 15
+  },
+  "version": "1.0.0",
+  "created_at": "2026-10-07T00:00:00.000Z",
+  "updated_at": "2026-10-07T00:00:00.000Z"
+}

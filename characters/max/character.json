@@ -1,0 +1,23 @@
+{
+  "character_id": "max",
+  "display_name": "Max",
+  "canonical_description": "A curious cartoon inventor kid with messy auburn hair, oversized goggles, and a bright blue hoodie. Friendly, energetic, always tinkering.",
+  "visual_reference": "characters/max/visual-reference.md",
+  "omnichar_artifact": null,
+  "voice": {
+    "provider": null,
+    "voice_id": null,
+    "style_notes": "Youthful, enthusiastic, clear diction"
+  },
+  "personality": ["curious", "brave", "inventive"],
+  "wardrobe": ["blue hoodie", "cargo shorts", "goggles on forehead"],
+  "allowed_styles": ["cartoon", "anime-cel", "crayon-storybook"],
+  "consistency": {
+    "lock_face": true,
+    "lock_palette": true,
+    "max_drift_score": 15
+  },
+  "version": "1.0.0",
+  "created_at": "2026-10-07T00:00:00.000Z",
+  "updated_at": "2026-10-07T00:00:00.000Z"
+}
