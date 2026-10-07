@@ -54,6 +54,7 @@ export interface RuntimeConfig {
     redirectUri: string;
     tokenPath: string;
     defaultPrivacy: "private" | "unlisted" | "public";
+    dryRunDefault: boolean;
   };
 }
 
@@ -87,6 +88,7 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
       redirectUri: env.YOUTUBE_REDIRECT_URI || "http://127.0.0.1",
       tokenPath: env.YOUTUBE_TOKEN_PATH || "./data/youtube-token.json",
       defaultPrivacy: (env.DEFAULT_PRIVACY_STATUS as RuntimeConfig["youtube"]["defaultPrivacy"]) || "private",
+      dryRunDefault: env.YOUTUBE_DRY_RUN !== "false",
     },
   };
 }

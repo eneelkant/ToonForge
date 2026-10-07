@@ -1,29 +1,165 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createYoutubeAdapter } from "../../src/adapters/youtube/index.js";
+import type { YoutubeApiClient } from "../../src/adapters/youtube/types.js";
 
-describe("youtube adapter foundation", () => {
-  it("validates metadata and stubs upload", async () => {
-    const yt = createYoutubeAdapter({
-      redirectUri: "http://127.0.0.1",
-      tokenPath: "./data/youtube-token.json",
-      defaultPrivacy: "private",
-    });
+function tmpVideo(): { dir: string; videoPath: string; thumbPath: string } {
+  const dir = mkdtempSync(join(tmpdir(), "tf-yt-"));
+  const videoPath = join(dir, "out.mp4");
+  const thumbPath = join(dir, "thumb.jpg");
+  writeFileSync(videoPath, "fake-mp4");
+  writeFileSync(thumbPath, "fake-jpg");
+  return { dir, videoPath, thumbPath };
+}
+
+describe("youtube adapter", () => {
+  const config = {
+    clientId: "id",
+    clientSecret: "secret",
+    redirectUri: "http://127.0.0.1",
+    tokenPath: "./data/youtube-token.json",
+    defaultPrivacy: "private" as const,
+    dryRunDefault: true,
+  };
+
+  it("validates metadata", async () => {
+    const yt = createYoutubeAdapter(config, { dataDir: mkdtempSync(join(tmpdir(), "tf-data-")) });
     const bad = await yt.validate_metadata({
       title: "",
       description: "",
       privacyStatus: "private",
     });
     expect(bad.ok).toBe(false);
+  });
 
-    const result = await yt.upload({
-      idempotencyKey: "pub:p:v",
-      videoPath: "/tmp/missing.mp4",
+  it("dry-runs publish and is idempotent", async () => {
+    const { dir, videoPath, thumbPath } = tmpVideo();
+    const dataDir = mkdtempSync(join(tmpdir(), "tf-data-"));
+    const yt = createYoutubeAdapter(config, { dataDir, dryRunDefault: true });
+    const req = {
+      idempotencyKey: "pub:p1:v1",
+      projectId: "p1",
+      videoId: "v1",
+      videoPath,
+      workflowState: "READY_TO_PUBLISH",
+      qaStatus: "PASS" as const,
+      policyStatus: "PASS" as const,
       metadata: {
-        title: "Test",
+        title: "Original Max Adventure",
+        description: "Original cartoon",
+        privacyStatus: "private" as const,
+        thumbnailPath: thumbPath,
+      },
+      provenance: {
+        originalContent: true,
+        thirdPartyFootage: false,
+        licensedAssets: [],
+        notes: [],
+      },
+    };
+    const first = await yt.publish(req);
+    expect(first.status).toBe("dry_run");
+    const second = await yt.publish(req);
+    expect(second.status).toBe("dry_run");
+    expect(second.detail).toMatch(/Idempotent/);
+    const manifest = await yt.getManifest("pub:p1:v1");
+    expect(manifest?.projectId).toBe("p1");
+    expect(dir).toBeTruthy();
+  });
+
+  it("blocks FAIL QA and third-party footage", async () => {
+    const { videoPath } = tmpVideo();
+    const dataDir = mkdtempSync(join(tmpdir(), "tf-data-"));
+    const yt = createYoutubeAdapter(config, { dataDir });
+    await expect(
+      yt.publish({
+        idempotencyKey: "pub:p2:v2",
+        projectId: "p2",
+        videoId: "v2",
+        videoPath,
+        workflowState: "READY_TO_PUBLISH",
+        qaStatus: "FAIL",
+        metadata: { title: "t", description: "d", privacyStatus: "private" },
+      }),
+    ).rejects.toMatchObject({ code: "QA_BLOCK" });
+
+    await expect(
+      yt.publish({
+        idempotencyKey: "pub:p3:v3",
+        projectId: "p3",
+        videoId: "v3",
+        videoPath,
+        workflowState: "READY_TO_PUBLISH",
+        qaStatus: "PASS",
+        metadata: { title: "t", description: "d", privacyStatus: "private" },
+        provenance: {
+          originalContent: true,
+          thirdPartyFootage: true,
+          licensedAssets: [],
+          notes: [],
+        },
+      }),
+    ).rejects.toMatchObject({ code: "POLICY_VIOLATION" });
+  });
+
+  it("uploads via injected API client when dryRun=false", async () => {
+    const { videoPath, thumbPath } = tmpVideo();
+    const dataDir = mkdtempSync(join(tmpdir(), "tf-data-"));
+    const api: YoutubeApiClient = {
+      uploadVideo: vi.fn(async () => ({ youtubeId: "yt_123" })),
+      setThumbnail: vi.fn(async () => undefined),
+      updateVideo: vi.fn(async () => undefined),
+      getVideo: vi.fn(async () => ({ id: "yt_123" })),
+      getAnalytics: vi.fn(async () => ({ views: 1 })),
+      addToPlaylist: vi.fn(async () => undefined),
+    };
+    const yt = createYoutubeAdapter(config, { dataDir, apiClient: api, dryRunDefault: false });
+    const result = await yt.publish({
+      idempotencyKey: "pub:p4:v4",
+      projectId: "p4",
+      videoId: "v4",
+      videoPath,
+      dryRun: false,
+      workflowState: "READY_TO_PUBLISH",
+      qaStatus: "PASS",
+      policyStatus: "PASS",
+      metadata: {
+        title: "Live",
         description: "Desc",
         privacyStatus: "private",
+        thumbnailPath: thumbPath,
+        playlistId: "pl1",
+      },
+      provenance: {
+        originalContent: true,
+        thirdPartyFootage: false,
+        licensedAssets: [],
+        notes: [],
       },
     });
-    expect(result.status).toBe("stub");
+    expect(result.status).toBe("published");
+    expect(result.youtubeId).toBe("yt_123");
+    expect(api.uploadVideo).toHaveBeenCalledOnce();
+    expect(api.setThumbnail).toHaveBeenCalledOnce();
+    expect(api.addToPlaylist).toHaveBeenCalledOnce();
+  });
+
+  it("pause blocks publishing", async () => {
+    const { videoPath } = tmpVideo();
+    const dataDir = mkdtempSync(join(tmpdir(), "tf-data-"));
+    const yt = createYoutubeAdapter(config, { dataDir });
+    await yt.pause_publishing();
+    await expect(
+      yt.publish({
+        idempotencyKey: "pub:p5:v5",
+        projectId: "p5",
+        videoId: "v5",
+        videoPath,
+        workflowState: "READY_TO_PUBLISH",
+        metadata: { title: "t", description: "d", privacyStatus: "private" },
+      }),
+    ).rejects.toMatchObject({ code: "POLICY_VIOLATION" });
   });
 });

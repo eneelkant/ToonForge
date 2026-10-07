@@ -21,11 +21,12 @@
     "format:check": "node -e \"console.log('format:check placeholder — prettier not required yet')\""
   },
   "dependencies": {
+    "googleapis": "^148.0.0",
     "yaml": "^2.8.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/node": "^22.20.4",
+    "@types/node": "^22.20.5",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
