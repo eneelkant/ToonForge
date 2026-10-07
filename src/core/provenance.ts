@@ -2,8 +2,22 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { MediaKind } from "./media.js";
 
+export interface ReferenceProvenanceEntry {
+  id: string;
+  role: "reference-format-analysis" | "trend_structure" | string;
+  pathOrUrl?: string;
+  sourceProvider?: string;
+  observedAt?: string;
+  footageReused: boolean;
+  assetsReused: boolean;
+  analysisOnly: boolean;
+  licenseStatus: "unknown" | "authorized" | "not_applicable";
+  designation?: string;
+  notes?: string;
+}
+
 export interface ProvenanceRecord {
-  referenceSources: Array<{ id: string; role: string; pathOrUrl?: string; notes?: string }>;
+  referenceSources: ReferenceProvenanceEntry[];
   creativeTransformations: string[];
   charactersUsed: Array<{ id: string; version: string; role?: string }>;
   generatedAssets: Array<{
@@ -19,6 +33,7 @@ export interface ProvenanceRecord {
   originalContent: boolean;
   thirdPartyFootage: boolean;
   policyNotes: string[];
+  pipelineMode?: "offline_fixture" | "reelmimic";
 }
 
 export function emptyProvenance(): ProvenanceRecord {
@@ -35,6 +50,22 @@ export function emptyProvenance(): ProvenanceRecord {
     thirdPartyFootage: false,
     policyNotes: [],
   };
+}
+
+export function addReferenceProvenance(
+  record: ProvenanceRecord,
+  entry: ReferenceProvenanceEntry,
+): void {
+  record.referenceSources.push(entry);
+  if (entry.licenseStatus === "unknown") {
+    record.policyNotes.push(
+      `Reference ${entry.id}: license/authorization unknown — analysis-only; not cleared for reuse`,
+    );
+  }
+  if (entry.footageReused || entry.assetsReused) {
+    record.thirdPartyFootage = true;
+    record.policyNotes.push(`Reference ${entry.id}: reuse flagged — publish must fail closed`);
+  }
 }
 
 export function stamp(event: string): { event: string; at: string } {

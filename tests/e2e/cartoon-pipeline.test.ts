@@ -10,9 +10,11 @@ import { validateAudio, validateImage, validateVideo } from "../../src/core/medi
 describe("e2e cartoon pipeline", () => {
   it("proves transitions, valid media, qa, idempotent dry publish", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "tf-e2e-"));
-    const first = await runDailyWorkflow({ dryRun: true, dataDir });
+    const first = await runDailyWorkflow({ dryRun: true, dataDir, pipelineMode: "offline_fixture" });
     expect(first.state).toBe("COMPLETE");
+    expect(first.pipelineMode).toBe("offline_fixture");
     expect(first.error).toBeUndefined();
+    expect(existsSync(join(dataDir, "projects", first.projectId, "synthetic-reference.txt"))).toBe(false);
     expect(existsSync(first.artifacts.storyPath!)).toBe(true);
     expect(existsSync(first.artifacts.videoPath!)).toBe(true);
     expect(existsSync(join(dataDir, "projects", first.projectId, "character-continuity.json"))).toBe(true);

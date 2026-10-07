@@ -3,6 +3,7 @@ import { newId } from "../../core/ids.js";
 import type { CharacterRecord } from "../../characters/types.js";
 import type { TrendCandidate } from "../trend/index.js";
 import type { ReferenceAnalysisReport } from "../../adapters/reelmimic/types.js";
+import { toStoryFormatHints, type StoryFormatHints } from "../reference/index.js";
 
 export interface StoryScene {
   id: string;
@@ -14,6 +15,10 @@ export interface StoryScene {
   characters: string[];
 }
 
+/**
+ * Materially original story. Format hints may influence structure/pacing only —
+ * never copied dialogue, scripts, or protected expression from a reference.
+ */
 export interface OriginalStory {
   story_id: string;
   trend_id?: string;
@@ -27,6 +32,8 @@ export interface OriginalStory {
   dialogue: string[];
   duration_target: number;
   format: "shorts" | "long_form";
+  /** Explicit format-level signals used (structure only). */
+  format_hints?: StoryFormatHints;
   originality_notes: string[];
   risk_flags: string[];
   version: string;
@@ -37,6 +44,7 @@ export function generateOriginalStory(input: {
   trend?: TrendCandidate;
   characters: CharacterRecord[];
   reference?: ReferenceAnalysisReport | null;
+  formatHints?: StoryFormatHints | null;
   durationTarget?: number;
   format?: "shorts" | "long_form";
 }): OriginalStory {
@@ -48,23 +56,44 @@ export function generateOriginalStory(input: {
   const side = chars[1];
   const duration = input.durationTarget ?? 45;
   const topic = input.trend?.topic ?? "everyday cartoon adventure";
-  const pacingNote = input.reference?.shot_count
-    ? `Inspired by reference pacing (~${input.reference.shot_count} shots), not copied content`
-    : "No reference analysis; using default short pacing";
+  const hints =
+    input.formatHints ?? (input.reference ? toStoryFormatHints(input.reference) : null);
 
-  const scenes: StoryScene[] = [
-    {
-      id: "sc_01",
-      title: "Hook",
-      action: `${lead.display_name} discovers an unexpected problem.`,
-      dialogue: `${lead.display_name}: "We can fix this — our way!"`,
-      narration: `When a tiny crisis pops up, ${lead.display_name} leaps into action.`,
-      duration_seconds: Math.round(duration * 0.2),
-      characters: [lead.character_id],
-    },
-    {
-      id: "sc_02",
-      title: "Teamwork",
+  const shotHint = hints?.shot_count
+    ? `Format analysis suggests ~${hints.shot_count} shot rhythm (structure only)`
+    : "Default short pacing (no format analysis)";
+  const hookPattern = hints?.hook_pattern ?? "problem-in-first-3s";
+  const structure = hints?.scene_structure?.length
+    ? hints.scene_structure
+    : ["hook", "escalation", "payoff"];
+
+  const scenes: StoryScene[] = structure.slice(0, 4).map((label, index) => {
+    const portion = index === 0 ? 0.2 : index === structure.length - 1 ? 0.35 : 0.45 / Math.max(1, structure.length - 2);
+    if (label === "hook" || index === 0) {
+      return {
+        id: `sc_${String(index + 1).padStart(2, "0")}`,
+        title: "Hook",
+        action: `${lead.display_name} discovers an unexpected problem.`,
+        dialogue: `${lead.display_name}: "We can fix this — our way!"`,
+        narration: `When a tiny crisis pops up, ${lead.display_name} leaps into action.`,
+        duration_seconds: Math.round(duration * portion),
+        characters: [lead.character_id],
+      };
+    }
+    if (label === "payoff" || index === structure.length - 1) {
+      return {
+        id: `sc_${String(index + 1).padStart(2, "0")}`,
+        title: "Resolution",
+        action: `The plan works in a surprising, original way.`,
+        dialogue: `${lead.display_name}: "That's our story — brand new!"`,
+        narration: `The day is saved, and the friends celebrate their own solution.`,
+        duration_seconds: Math.round(duration * portion),
+        characters: chars.map((c) => c.character_id),
+      };
+    }
+    return {
+      id: `sc_${String(index + 1).padStart(2, "0")}`,
+      title: "Escalation",
       action: side
         ? `${lead.display_name} and ${side.display_name} try a creative plan.`
         : `${lead.display_name} invents a clever workaround.`,
@@ -72,24 +101,15 @@ export function generateOriginalStory(input: {
         ? `${side.display_name}: "Step one: don't panic. Step two: invent!"`
         : `${lead.display_name}: "Version two is always better."`,
       narration: `Together they experiment, fail once, and learn fast.`,
-      duration_seconds: Math.round(duration * 0.45),
+      duration_seconds: Math.round(duration * portion),
       characters: chars.slice(0, 2).map((c) => c.character_id),
-    },
-    {
-      id: "sc_03",
-      title: "Resolution",
-      action: `The plan works in a surprising, original way.`,
-      dialogue: `${lead.display_name}: "That's our story — brand new!"`,
-      narration: `The day is saved, and the friends celebrate their own solution.`,
-      duration_seconds: Math.round(duration * 0.35),
-      characters: chars.map((c) => c.character_id),
-    },
-  ];
+    };
+  });
 
   const title = `${lead.display_name} and the Original Fix`;
   const narration = scenes.map((s) => s.narration).join(" ");
   const dialogue = scenes.map((s) => s.dialogue);
-  const body = JSON.stringify({ title, scenes, narration, dialogue, topic });
+  const body = JSON.stringify({ title, scenes, narration, dialogue, topic, hookPattern });
   const script_hash = createHash("sha256").update(body).digest("hex");
 
   return {
@@ -98,17 +118,22 @@ export function generateOriginalStory(input: {
     title,
     logline: `An original cartoon short where ${lead.display_name} solves a problem inspired by the theme "${topic}" without copying any reference expression.`,
     hook: scenes[0]!.dialogue,
-    synopsis: `Theme: ${topic}. ${pacingNote}.`,
+    synopsis: `Theme: ${topic}. Hook pattern (structure only): ${hookPattern}. ${shotHint}.`,
     characters: chars.map((c) => c.character_id),
     scenes,
     narration,
     dialogue,
     duration_target: duration,
     format: input.format ?? "shorts",
+    format_hints: hints ?? undefined,
     originality_notes: [
       "New title, dialogue, and plot beats generated for ToonForge characters",
-      pacingNote,
+      shotHint,
+      `Story structure labels: ${structure.join(" → ")} (format inspiration, original expression)`,
       "No third-party footage, music, or copyrighted characters used",
+      hints?.offline_fixture
+        ? "Format hints from offline fixture analysis (not a live reference video)"
+        : "Format hints from reference analysis report when available",
     ],
     risk_flags: [],
     version: "1.0.0",

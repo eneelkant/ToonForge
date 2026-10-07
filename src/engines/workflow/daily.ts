@@ -4,7 +4,7 @@ import { loadChannelConfig, loadRuntimeConfig, assertNotKilled } from "../../cor
 import { newId } from "../../core/ids.js";
 import { transition, type WorkflowRecord, type WorkflowState } from "../../core/state.js";
 import { defaultCharacterRegistry } from "../../characters/registry.js";
-import { ManualSeedTrendProvider, dedupeTrends, selectOpportunity } from "../trend/index.js";
+import { discoverTrendsForChannel, selectOpportunity } from "../trend/index.js";
 import { generateOriginalStory, validateStory } from "../story/index.js";
 import { createStoryboard } from "../storyboard/index.js";
 import { buildContinuityPlan, persistContinuityPlan, validateContinuityPlan } from "../continuity/index.js";
@@ -15,15 +15,23 @@ import { buildContentPackage } from "../packaging/index.js";
 import { runQa } from "../qa/index.js";
 import { createYoutubeAdapter } from "../../adapters/youtube/index.js";
 import { createReelMimicAdapter } from "../../adapters/reelmimic/index.js";
+import { writeAnalysisReport } from "../../adapters/reelmimic/analyze.js";
 import { SupervisorAgent } from "../../agents/supervisor/index.js";
 import { rootLogger } from "../../core/logging.js";
 import {
+  addReferenceProvenance,
   emptyProvenance,
   persistProvenance,
   stamp,
   type ProvenanceRecord,
 } from "../../core/provenance.js";
 import { muxVideoAudio, writeMediaSidecar } from "../../core/media.js";
+import {
+  resolvePipelineMode,
+  resolveReference,
+  toStoryFormatHints,
+  type PipelineMode,
+} from "../reference/index.js";
 
 const log = rootLogger.child("engines.workflow.daily");
 
@@ -33,6 +41,7 @@ export interface DailyWorkflowResult {
   channelId: string;
   state: WorkflowState;
   dryRun: boolean;
+  pipelineMode: PipelineMode;
   artifacts: Record<string, string | undefined>;
   qa: Awaited<ReturnType<typeof runQa>>;
   publish?: unknown;
@@ -55,8 +64,11 @@ export async function runDailyWorkflow(opts: {
   channelPath?: string;
   dryRun?: boolean;
   dataDir?: string;
-  /** When true and dryRun=false, attempt live publish (still gated). */
   publish?: boolean;
+  /** Explicit pipeline mode. When omitted: reelmimic if enabled, else offline_fixture. */
+  pipelineMode?: PipelineMode;
+  referencePath?: string;
+  referenceUrl?: string;
 }): Promise<DailyWorkflowResult> {
   const config = loadRuntimeConfig();
   assertNotKilled(config);
@@ -65,6 +77,12 @@ export async function runDailyWorkflow(opts: {
 
   const channel = loadChannelConfig(opts.channelPath ?? "config/channels/cartoon-default.yaml");
   const dryRun = opts.dryRun ?? true;
+  const pipelineMode = resolvePipelineMode({
+    reelmimicEnabled: config.reelmimic.enabled,
+    mode: opts.pipelineMode,
+    preferOfflineFixture: true,
+  });
+
   const projectId = newId("proj");
   const workflowId = newId("wf_daily");
   const projectDir = join(opts.dataDir ?? config.dataDir, "projects", projectId);
@@ -78,9 +96,10 @@ export async function runDailyWorkflow(opts: {
     retryCount: 0,
     updatedAt: new Date().toISOString(),
   };
-  persistWorkflow(projectDir, record, { channelId: channel.channel_id });
+  persistWorkflow(projectDir, record, { channelId: channel.channel_id, pipelineMode, dryRun });
 
   const provenance: ProvenanceRecord = emptyProvenance();
+  provenance.pipelineMode = pipelineMode;
   provenance.timestamps.push(stamp("workflow.start"));
   provenance.creativeTransformations.push(
     "Trend/reference used for pacing/structure signals only — original script, characters, and media",
@@ -89,35 +108,98 @@ export async function runDailyWorkflow(opts: {
 
   try {
     record = advance(record, "RESEARCHING");
-    persistWorkflow(projectDir, record);
-    log.info("daily.state", { workflowId, projectId, channelId: channel.channel_id, state: record.state });
+    persistWorkflow(projectDir, record, { pipelineMode });
+    log.info("daily.state", {
+      workflowId,
+      projectId,
+      channelId: channel.channel_id,
+      state: record.state,
+      pipelineMode,
+      trendSources: channel.trend_sources,
+    });
 
-    const provider = new ManualSeedTrendProvider();
-    const trends = dedupeTrends(await provider.discover({ niche: channel.niche, limit: 5 }));
-    writeFileSync(join(projectDir, "trends.json"), JSON.stringify(trends, null, 2));
+    const { trends, providers } = await discoverTrendsForChannel({
+      trendSources: channel.trend_sources,
+      niche: channel.niche,
+      limit: 5,
+    });
+    writeFileSync(
+      join(projectDir, "trends.json"),
+      JSON.stringify({ providers, trends }, null, 2),
+    );
+    provenance.providers.push(...providers.map((name) => ({ name, role: "trend" })));
     provenance.timestamps.push(stamp("trends.discovered"));
 
     record = advance(record, "ANALYZING");
     persistWorkflow(projectDir, record);
     const selected = selectOpportunity(trends);
     if (!selected) throw new Error("No suitable trend opportunity");
-    const reelmimic = createReelMimicAdapter(config.reelmimic);
-    const syntheticRef = join(projectDir, "synthetic-reference.txt");
-    writeFileSync(
-      syntheticRef,
-      "Synthetic local reference placeholder for structure analysis only. Not third-party footage.\n",
-    );
-    const analysis = await reelmimic.analyzeReference({
-      sourcePath: syntheticRef,
-      outDir: join(projectDir, "analysis"),
-    });
     writeFileSync(join(projectDir, "selected-trend.json"), JSON.stringify(selected, null, 2));
-    provenance.referenceSources.push({
+
+    const resolved = resolveReference({
+      mode: pipelineMode,
+      trend: selected,
+      projectDir,
+      referencePathOverride: opts.referencePath,
+      referenceUrlOverride: opts.referenceUrl,
+    });
+
+    const reelmimic = createReelMimicAdapter(config.reelmimic);
+    const analysisDir = join(projectDir, "analysis");
+    mkdirSync(analysisDir, { recursive: true });
+
+    let analysisReport = resolved.offlineFormatReport;
+    let analysisReportPath = join(analysisDir, "reference-analysis.json");
+    let analysisStub = true;
+
+    if (pipelineMode === "reelmimic") {
+      if (!resolved.referencePath && !resolved.referenceUrl) {
+        throw new Error("ReelMimic mode resolved no video reference");
+      }
+      const analysis = await reelmimic.analyzeReference({
+        sourcePath: resolved.referencePath,
+        sourceUrl: resolved.referenceUrl,
+        outDir: analysisDir,
+      });
+      analysisReport = analysis.report;
+      analysisReportPath = analysis.reportPath;
+      analysisStub = analysis.stub;
+    } else if (analysisReport) {
+      analysisReportPath = writeAnalysisReport(analysisDir, analysisReport);
+      analysisStub = true;
+    } else {
+      throw new Error("Offline fixture missing format analysis report");
+    }
+
+    addReferenceProvenance(provenance, {
       id: selected.id,
-      role: "trend_structure",
-      notes: "Topic/pacing inspiration only",
+      role: "reference-format-analysis",
+      pathOrUrl: resolved.referencePath ?? resolved.referenceUrl,
+      sourceProvider: selected.source,
+      observedAt: new Date().toISOString(),
+      footageReused: false,
+      assetsReused: false,
+      analysisOnly: true,
+      licenseStatus: resolved.licenseStatus,
+      designation: resolved.designation,
+      notes: resolved.notes.join("; "),
     });
     provenance.timestamps.push(stamp("reference.analyzed"));
+    writeFileSync(
+      join(projectDir, "reference-resolution.json"),
+      JSON.stringify(
+        {
+          pipelineMode,
+          designation: resolved.designation,
+          referencePath: resolved.referencePath ?? null,
+          referenceUrl: resolved.referenceUrl ?? null,
+          analysisStub,
+          notes: resolved.notes,
+        },
+        null,
+        2,
+      ),
+    );
 
     record = advance(record, "STORY_GENERATED");
     persistWorkflow(projectDir, record);
@@ -126,23 +208,25 @@ export async function runDailyWorkflow(opts: {
       roles: ["lead", "sidekick"],
       preferredIds: channel.characters,
     });
-    // Enforce known recurring cast when channel lists them.
     for (const id of channel.characters) {
       const known = await registry.get(id);
       if (!known) {
         throw new Error(`Channel character missing from registry: ${id}`);
       }
     }
+    const formatHints = toStoryFormatHints(analysisReport!);
     const story = generateOriginalStory({
       trend: selected,
       characters,
-      reference: analysis.report,
+      reference: analysisReport,
+      formatHints,
       durationTarget: channel.duration_seconds,
       format: channel.format === "long_form" ? "long_form" : "shorts",
     });
     const storyValidation = validateStory(story);
     if (!storyValidation.ok) throw new Error(`Story invalid: ${storyValidation.errors.join(", ")}`);
     writeFileSync(join(projectDir, "story.json"), JSON.stringify(story, null, 2));
+    writeFileSync(join(projectDir, "format-hints.json"), JSON.stringify(formatHints, null, 2));
     for (const c of characters) {
       provenance.charactersUsed.push({
         id: c.character_id,
@@ -182,8 +266,10 @@ export async function runDailyWorkflow(opts: {
       projectDir,
       story,
       storyboard,
-      reelmimic: config.reelmimic.enabled ? reelmimic : null,
-      allowDevFixture: dryRun || !config.reelmimic.enabled,
+      reelmimic: pipelineMode === "reelmimic" ? reelmimic : null,
+      mode: pipelineMode,
+      referencePath: resolved.referencePath,
+      referenceUrl: resolved.referenceUrl,
       durationSec: Math.min(6, Math.max(2, Math.floor(channel.duration_seconds / 15) || 3)),
     });
     provenance.generatedAssets.push({
@@ -219,7 +305,7 @@ export async function runDailyWorkflow(opts: {
     writeMediaSidecar(assembledPath, {
       kind: production.kind,
       provider: production.kind === "reelmimic" ? "reelmimic" : "ffmpeg",
-      notes: ["assembled final mux"],
+      notes: ["assembled final mux", `pipelineMode=${pipelineMode}`],
     });
     provenance.generatedAssets.push({
       type: "video",
@@ -250,6 +336,7 @@ export async function runDailyWorkflow(opts: {
     record = advance(record, "QA");
     persistWorkflow(projectDir, record);
     const provenancePath = persistProvenance(projectDir, provenance);
+    const allowDevFixtures = pipelineMode === "offline_fixture";
     const qa = await runQa({
       videoPath: assembledPath,
       audioPath: audio.mixPath,
@@ -258,8 +345,8 @@ export async function runDailyWorkflow(opts: {
       metadata: { title: pack.title, description: pack.description },
       storyComplete: true,
       originalContent: true,
-      thirdPartyFootage: false,
-      allowDevFixtures: dryRun,
+      thirdPartyFootage: provenance.thirdPartyFootage,
+      allowDevFixtures,
       provenance,
       expectedDurationSec: channel.duration_seconds,
       requireAudio: true,
@@ -270,17 +357,19 @@ export async function runDailyWorkflow(opts: {
       projectId,
       verdict: qa.verdict,
       mediaKinds: qa.mediaKinds,
+      pipelineMode,
     });
 
     if (qa.verdict === "FAIL") {
       record = advance(record, "FAILED");
-      persistWorkflow(projectDir, record, { error: "QA FAIL" });
+      persistWorkflow(projectDir, record, { error: "QA FAIL", pipelineMode });
       return {
         workflowId,
         projectId,
         channelId: channel.channel_id,
         state: record.state,
         dryRun,
+        pipelineMode,
         artifacts: { videoPath: assembledPath },
         qa,
         provenancePath,
@@ -313,7 +402,7 @@ export async function runDailyWorkflow(opts: {
       },
       provenance: {
         originalContent: true,
-        thirdPartyFootage: false,
+        thirdPartyFootage: provenance.thirdPartyFootage,
         licensedAssets: [],
         notes: story.originality_notes,
       },
@@ -332,8 +421,14 @@ export async function runDailyWorkflow(opts: {
     record = advance(record, "COMPLETE");
     provenance.timestamps.push(stamp("workflow.complete"));
     persistProvenance(projectDir, provenance);
-    persistWorkflow(projectDir, record);
-    log.info("daily.complete", { workflowId, projectId, dryRun, channelId: channel.channel_id });
+    persistWorkflow(projectDir, record, { pipelineMode });
+    log.info("daily.complete", {
+      workflowId,
+      projectId,
+      dryRun,
+      pipelineMode,
+      channelId: channel.channel_id,
+    });
 
     return {
       workflowId,
@@ -341,6 +436,7 @@ export async function runDailyWorkflow(opts: {
       channelId: channel.channel_id,
       state: record.state,
       dryRun,
+      pipelineMode,
       artifacts: {
         videoPath: assembledPath,
         sourceVideoPath: production.videoPath,
@@ -348,8 +444,9 @@ export async function runDailyWorkflow(opts: {
         captionsPath: pack.captionsPath,
         thumbnailPath: pack.thumbnailPath,
         storyPath: join(projectDir, "story.json"),
-        analysisPath: analysis.reportPath,
+        analysisPath: analysisReportPath,
         provenancePath,
+        referenceResolutionPath: join(projectDir, "reference-resolution.json"),
       },
       qa,
       publish,
@@ -357,7 +454,13 @@ export async function runDailyWorkflow(opts: {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error("daily.failed", { workflowId, projectId, error: message, state: record.state });
+    log.error("daily.failed", {
+      workflowId,
+      projectId,
+      error: message,
+      state: record.state,
+      pipelineMode,
+    });
     try {
       if (record.state !== "FAILED" && record.state !== "COMPLETE") {
         record = transition(record, "FAILED", message);
@@ -366,13 +469,14 @@ export async function runDailyWorkflow(opts: {
       /* ignore illegal transition on outer failure */
     }
     persistProvenance(projectDir, provenance);
-    persistWorkflow(projectDir, record, { error: message });
+    persistWorkflow(projectDir, record, { error: message, pipelineMode });
     return {
       workflowId,
       projectId,
       channelId: channel.channel_id,
       state: "FAILED",
       dryRun,
+      pipelineMode,
       artifacts: {},
       qa: { verdict: "FAIL", checks: [] },
       error: message,
