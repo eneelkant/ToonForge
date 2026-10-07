@@ -25,6 +25,20 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (cmd === "omnichar" && sub === "health") {
+    const { createOmniCharAdapter } = await import("../adapters/omnichar/index.js");
+    const adapter = createOmniCharAdapter(config.omnichar);
+    console.log(JSON.stringify(await adapter.health(), null, 2));
+    return;
+  }
+
+  if (cmd === "omnichar" && sub === "list") {
+    const { createOmniCharAdapter } = await import("../adapters/omnichar/index.js");
+    const adapter = createOmniCharAdapter(config.omnichar);
+    console.log(JSON.stringify(await adapter.listCharacters(), null, 2));
+    return;
+  }
+
   if (cmd === "system" && sub === "status") {
     console.log(JSON.stringify(await getSystemStatus(config), null, 2));
     return;
@@ -77,6 +91,8 @@ function printHelp(): void {
 Commands:
   doctor
   characters list
+  omnichar health
+  omnichar list
   system status
   config channel [path]
   workflow start [name]

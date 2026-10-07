@@ -11,13 +11,25 @@ export async function getSystemStatus(config: RuntimeConfig) {
   const youtube = createYoutubeAdapter(config.youtube);
   const orchestrator = createOrchestrator(config.ruflo);
 
+  const omnicharProbe = await omnichar.probe();
+  const omnicharHealth = await omnichar.health();
+
   return {
     killSwitch: config.killSwitch,
     adapters: {
-      omnichar: await omnichar.probe(),
+      omnichar: omnicharProbe,
+      omnicharHealth,
       reelmimic: await reelmimic.probe(),
       youtube: await youtube.probe(),
       orchestrator: await orchestrator.probe(),
+    },
+    config: {
+      omnichar: {
+        enabled: config.omnichar.enabled,
+        baseUrl: config.omnichar.baseUrl,
+        timeoutMs: config.omnichar.timeoutMs,
+        maxRetries: config.omnichar.maxRetries,
+      },
     },
     budgets: {
       dailyBudgetUsd: config.dailyBudgetUsd,
