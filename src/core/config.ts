@@ -34,7 +34,12 @@ export interface RuntimeConfig {
   perVideoBudgetUsd: number;
   maxConcurrentJobs: number;
   maxRetries: number;
-  omnichar: { enabled: boolean; baseUrl: string };
+  omnichar: {
+    enabled: boolean;
+    baseUrl: string;
+    timeoutMs: number;
+    maxRetries: number;
+  };
   reelmimic: { enabled: boolean; baseUrl: string; root?: string };
   ruflo: { enabled: boolean };
   youtube: {
@@ -57,6 +62,8 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     omnichar: {
       enabled: env.OMNICHAR_ENABLED === "true",
       baseUrl: env.OMNICHAR_BASE_URL || "http://127.0.0.1:8848",
+      timeoutMs: Number(env.OMNICHAR_TIMEOUT_MS || 10_000),
+      maxRetries: Number(env.OMNICHAR_MAX_RETRIES || 3),
     },
     reelmimic: {
       enabled: env.REELMIMIC_ENABLED === "true",
