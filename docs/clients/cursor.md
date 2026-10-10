@@ -25,8 +25,9 @@ Copy `.env.example` → `.env`. Never put secrets in MCP tool arguments.
 ## Example
 
 1. `toonforge.system_status`
-2. `toonforge.run_daily_workflow` with `dryRun: true`
-3. Inspect QA + publication manifest
+2. `toonforge.openmontage_health` (disabled unless `OPENMONTAGE_ENABLED=true`)
+3. `toonforge.run_daily_workflow` with `dryRun: true`
+4. Inspect QA + publication manifest
 
 ## Security
 

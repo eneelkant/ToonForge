@@ -6,6 +6,7 @@
 |-----------|-------------|---------|
 | **ToonForge** | This service (Node MCP/CLI) | Apache-2.0 |
 | **ReelMimic** | Separate process/HTTP on `:4318` | MIT — do not vendor into image |
+| **OpenMontage** | Separate checkout; Python tools via `OPENMONTAGE_ROOT` | AGPL-3.0 — do not vendor into image |
 | **OmniChar** | Separate process/HTTP on `:8848` | GPL — **network isolation only** |
 | **YouTube** | OAuth + Data API | Credentials via env/secrets |
 | **Data** | Persistent volume `/data` | Projects, manifests, tokens |
@@ -22,6 +23,8 @@ OMNICHAR_ENABLED=false
 OMNICHAR_BASE_URL=http://127.0.0.1:8848
 REELMIMIC_ENABLED=false
 REELMIMIC_BASE_URL=http://127.0.0.1:4318
+OPENMONTAGE_ENABLED=false
+OPENMONTAGE_ROOT=/absolute/path/to/OpenMontage
 REELMIMIC_ROOT=/path/to/reelmimic   # optional local analyze.py
 YOUTUBE_CLIENT_ID=
 YOUTUBE_CLIENT_SECRET=
@@ -98,6 +101,7 @@ Point `REELMIMIC_BASE_URL` / `OMNICHAR_BASE_URL` at host services via `host.dock
 | Kind | Meaning | Dry-run | Live YouTube |
 |------|---------|---------|--------------|
 | `reelmimic` | Real ReelMimic output | OK | OK |
+| `openmontage` | Validated OpenMontage character render | OK | OK for the video; audio may still be `ffmpeg_dev` |
 | `provider` | Real TTS/brand provider | OK | OK |
 | `ffmpeg_dev` | Valid FFmpeg CI/dev fixture | OK | **BLOCKED** |
 | `invalid_stub` | Text placeholder / `.bin` | **FAIL** | **BLOCKED** |

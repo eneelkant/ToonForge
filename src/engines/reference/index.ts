@@ -8,23 +8,30 @@ import { topicFingerprint } from "../trend/index.js";
 
 const VIDEO_EXTS = new Set([".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi"]);
 
-export type PipelineMode = "offline_fixture" | "reelmimic";
+export type PipelineMode = "offline_fixture" | "reelmimic" | "openmontage";
 
 /**
  * Resolve execution mode.
- * - offline_fixture: deterministic CI/dev; never pretends to be live ReelMimic
- * - reelmimic: real adapter path; requires valid video reference; no silent FFmpeg downgrade
+ * - offline_fixture: deterministic CI/dev; never pretends to be live production
+ * - reelmimic: real ReelMimic path; requires a valid video reference; no silent FFmpeg downgrade
+ * - openmontage: explicit OpenMontage character-animation path; no silent downgrade
  *
- * dryRun alone does NOT force fixtures when ReelMimic is enabled.
+ * Enabling OpenMontage does not change the default. An omitted channel backend keeps
+ * the historical choice: ReelMimic when enabled, otherwise the offline fixture.
+ * An explicit mode or channel backend is never replaced.
  */
 export function resolvePipelineMode(opts: {
   reelmimicEnabled: boolean;
+  openmontageEnabled?: boolean;
   /** Explicit override from CLI/MCP. */
   mode?: PipelineMode;
+  /** Channel `production_backend`, when set. */
+  channelBackend?: PipelineMode;
   /** Legacy opt-in for offline fixtures when ReelMimic disabled. */
   preferOfflineFixture?: boolean;
 }): PipelineMode {
   if (opts.mode) return opts.mode;
+  if (opts.channelBackend) return opts.channelBackend;
   if (opts.reelmimicEnabled) return "reelmimic";
   if (opts.preferOfflineFixture !== false) return "offline_fixture";
   return "reelmimic";
@@ -38,7 +45,7 @@ export interface ResolvedReference {
   referenceUrl?: string;
   /** Offline structured format report (no ReelMimic call). */
   offlineFormatReport?: ReferenceAnalysisReport;
-  designation: "offline_fixture" | "configured_path" | "trend_url" | "trend_path" | "override";
+  designation: "offline_fixture" | "openmontage_format" | "configured_path" | "trend_url" | "trend_path" | "override";
   licenseStatus: "unknown" | "authorized" | "not_applicable";
   notes: string[];
 }
@@ -165,22 +172,25 @@ export function resolveReference(opts: {
     };
   }
 
-  if (opts.mode === "offline_fixture") {
+  if (opts.mode === "offline_fixture" || opts.mode === "openmontage") {
     const report = buildOfflineFormatAnalysis(opts.trend);
     const analysisDir = join(opts.projectDir, "analysis");
     mkdirSync(analysisDir, { recursive: true });
     const reportPath = join(analysisDir, "reference-analysis.json");
     writeFileSync(reportPath, JSON.stringify(report, null, 2));
+    const openmontage = opts.mode === "openmontage";
     return {
-      mode: "offline_fixture",
+      mode: opts.mode,
       analysisOnly: true,
       offlineFormatReport: report,
-      designation: "offline_fixture",
+      designation: openmontage ? "openmontage_format" : "offline_fixture",
       licenseStatus: "not_applicable",
       notes: [
         ...notes,
-        "OFFLINE FIXTURE: structured format analysis only — not a real third-party video",
-        "No .txt placeholder passed to ReelMimic",
+        openmontage
+          ? "OPENMONTAGE: format fixture only — reference footage is not downloaded or embedded"
+          : "OFFLINE FIXTURE: structured format analysis only — not a real third-party video",
+        "No .txt placeholder passed to ReelMimic or OpenMontage",
         reportPath,
       ],
     };

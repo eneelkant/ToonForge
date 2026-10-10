@@ -134,6 +134,16 @@ export async function runDoctor(): Promise<void> {
     detail: JSON.stringify(status.adapters.youtube),
     remediation: "Configure YOUTUBE_CLIENT_ID/SECRET and OAuth token",
   });
+  const openmontageHealth = status.adapters.openmontageHealth;
+  checks.push({
+    name: "adapter:openmontage",
+    severity: openmontageHealth?.status === "ready" ? "PASS" : "WARN",
+    detail: openmontageHealth
+      ? `${openmontageHealth.status}: ${openmontageHealth.detail}`
+      : JSON.stringify(status.adapters.openmontage),
+    remediation:
+      "Optional. Install OpenMontage separately, then set OPENMONTAGE_ENABLED=true and OPENMONTAGE_ROOT to that checkout. Do not vendor its AGPL source.",
+  });
   checks.push({
     name: "adapter:orchestrator",
     severity: status.adapters.orchestrator.status === "ready" ? "PASS" : "WARN",

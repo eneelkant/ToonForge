@@ -36,6 +36,7 @@ Reference videos may inspire **structure** (hook, pacing, shot rhythm). They mus
 |------|----------|--------|
 | Characters | [OmniChar](https://github.com/omnichar/OmniChar) | GPL — process/HTTP isolation only (`:8848`) |
 | Production | [ReelMimic](https://github.com/edenfunf/reelmimic) | MIT — local HTTP (`:4318`) + file contract |
+| Production (optional) | [OpenMontage](https://github.com/calesthio/OpenMontage) | AGPL-3.0 — separate checkout, process adapter only |
 | Guidance | Karpathy-skills concepts | Mapped into ToonForge-owned policies |
 | YouTube publish | OAuth Data API adapter | Dry-run by default; idempotent manifests |
 | YouTube trends | Data API key (`chart=mostPopular`) | Optional live `trend_sources: [youtube]` — see docs |
@@ -45,7 +46,7 @@ Reference videos may inspire **structure** (hook, pacing, shot rhythm). They mus
 
 | Kind | Dry-run | Live YouTube |
 |------|---------|--------------|
-| `reelmimic` / `provider` | OK | OK |
+| `reelmimic` / `openmontage` / `provider` | OK | OK |
 | `ffmpeg_dev` (CI/dev FFmpeg fixture) | OK | **Blocked** |
 | `invalid_stub` (text `.mp4` / `.bin`) | **FAIL** | **Blocked** |
 

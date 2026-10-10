@@ -23,9 +23,26 @@ export const ChannelConfigSchema = z.object({
   trend_sources: z.array(z.string()).default(["manual"]),
   quality_threshold: z.number().min(0).max(1).default(0.7),
   risk_threshold: z.number().min(0).max(1).default(0.3),
+  /** Explicit production backend. Omitted keeps the historical auto selection. */
+  production_backend: z.enum(["offline_fixture", "reelmimic", "openmontage"]).optional(),
 });
 
 export type ChannelConfig = z.infer<typeof ChannelConfigSchema>;
+
+export interface OpenMontageConfig {
+  enabled: boolean;
+  root?: string;
+  python: string;
+  timeoutMs: number;
+  maxRetries: number;
+}
+
+function positiveInt(raw: string | undefined, fallback: number): number {
+  if (raw == null || raw.trim() === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  return Math.floor(value);
+}
 
 export interface RuntimeConfig {
   dataDir: string;
@@ -47,6 +64,7 @@ export interface RuntimeConfig {
     timeoutMs: number;
     maxRetries: number;
   };
+  openmontage: OpenMontageConfig;
   ruflo: { enabled: boolean; probeTimeoutMs: number };
   youtube: {
     clientId?: string;
@@ -88,6 +106,13 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
       root: env.REELMIMIC_ROOT,
       timeoutMs: Number(env.REELMIMIC_TIMEOUT_MS || 30_000),
       maxRetries: Number(env.REELMIMIC_MAX_RETRIES || 3),
+    },
+    openmontage: {
+      enabled: env.OPENMONTAGE_ENABLED === "true",
+      root: env.OPENMONTAGE_ROOT || undefined,
+      python: env.OPENMONTAGE_PYTHON || "python3",
+      timeoutMs: positiveInt(env.OPENMONTAGE_TIMEOUT_MS, 120_000),
+      maxRetries: positiveInt(env.OPENMONTAGE_MAX_RETRIES, 1),
     },
     ruflo: {
       enabled: env.RUFLO_ENABLED === "true",

@@ -41,6 +41,8 @@ export const MCP_TOOL_NAMES = [
   "toonforge.publish_video",
   "toonforge.get_video_status",
   "toonforge.get_analytics",
+  "toonforge.openmontage_health",
+  "toonforge.production_backends",
   "toonforge.run_daily_workflow",
   "toonforge.get_workflow_status",
   "toonforge.pause",
@@ -88,7 +90,11 @@ export function createToonForgeMcpServer(): Server {
       toolDef("toonforge.generate_story", "Generate an original story"),
       toolDef("toonforge.validate_story", "Validate story completeness/originality flags"),
       toolDef("toonforge.create_storyboard", "Build deterministic storyboard"),
-      toolDef("toonforge.generate_cartoon", "Produce cartoon artifact (local stub or ReelMimic)"),
+      toolDef("toonforge.generate_cartoon", "Produce cartoon artifact (offline fixture, ReelMimic, or OpenMontage)", {
+        pipelineMode: { type: "string", enum: ["offline_fixture", "reelmimic", "openmontage"] },
+      }),
+      toolDef("toonforge.openmontage_health", "OpenMontage install and probe status"),
+      toolDef("toonforge.production_backends", "Availability of offline, ReelMimic, and OpenMontage backends"),
       toolDef("toonforge.review_video", "Alias of run_qa"),
       toolDef("toonforge.generate_voice", "Generate voice audio bundle"),
       toolDef("toonforge.generate_music", "Generate music/mix bundle"),
@@ -104,6 +110,7 @@ export function createToonForgeMcpServer(): Server {
       toolDef("toonforge.run_daily_workflow", "Run resumable daily dry-run workflow", {
         channelPath: { type: "string" },
         dryRun: { type: "boolean" },
+        pipelineMode: { type: "string", enum: ["offline_fixture", "reelmimic", "openmontage"] },
       }),
       toolDef("toonforge.get_workflow_status", "Orchestrator workflow status", {
         workflowId: { type: "string" },

@@ -32,7 +32,7 @@ ToonForge
 ├── Trend Engine        — discovery / score / select
 ├── Story Engine        — original story from trend opportunity
 ├── Character Engine    — CharacterRegistry + OmniChar adapter
-├── Production Engine   — ReelMimic adapter (storyboard → video)
+├── Production Engine   — ReelMimic, optional OpenMontage, or explicit offline fixture
 ├── Audio Engine        — voice / dialogue / music / mix (provider interfaces)
 ├── Thumbnail Engine    — candidates + scoring
 ├── QA Engine           — PASS / WARN / BLOCK gates
@@ -48,7 +48,7 @@ ToonForge
 ### Adapter boundary rule
 
 Application code depends on **ToonForge interfaces** in `src/adapters/*/types.ts` (and engine facades).  
-It must not import OmniChar, ReelMimic, Ruflo, or AgentTube internals directly.
+It must not import OmniChar, ReelMimic, OpenMontage, Ruflo, or AgentTube internals directly.
 
 ---
 
@@ -58,6 +58,7 @@ It must not import OmniChar, ReelMimic, Ruflo, or AgentTube internals directly.
 |------|----------|--------------|----------|---------------------|------------------|
 | Character consistency / `.char` | OmniChar | https://github.com/omnichar/OmniChar | Python + TS UI | **GPL-3.0-or-later** | Process/HTTP only |
 | Cartoon production / reference analysis | ReelMimic | https://github.com/edenfunf/reelmimic | TypeScript + Python | **MIT** (+ bundled Apache/MIT third-party skills) | Local HTTP + file contract |
+| Optional character animation / composition | OpenMontage | https://github.com/calesthio/OpenMontage | Python + Node (Remotion) | **AGPL-3.0** | Separate checkout + stdin JSON runner. No vendored source. |
 | Agent planning guidance | andrej-karpathy-skills | https://github.com/multica-ai/andrej-karpathy-skills | Markdown policies | README claims **MIT**; **no LICENSE file**; GitHub `license: null` | Concept translation into ToonForge policies (no vendored copy until clarified) |
 | YouTube publish / schedule / analytics | youtube-automation-agent (AgentTube / Lumen) | https://github.com/darkzOGx/youtube-automation-agent | Node.js | **MIT** | Adapter over googleapis patterns + optional subprocess later |
 | Orchestration / memory | Ruflo (`ruflo` / `claude-flow` npm) | https://github.com/ruvnet/ruflo | TypeScript | **MIT** | Optional MCP/CLI; local fallback required |
@@ -99,6 +100,14 @@ Also observed: a third-party mirror `Fork-Auto-SocialBots/youtube-automation-age
 
 **ToonForge rule:** adapter discovers server health and maps ToonForge `ProductionEngine` operations onto the real REST/file contract. Do not invent CLI flags that are not documented.
 
+### OpenMontage (optional production)
+
+Inspected commit `9327439db69021ab4b0e2776729bf3b58fdb5a87`. License file is GNU AGPL-3.0. Python requires 3.10+. There is no production REST API. The agent drives `pipeline_defs/` and calls `BaseTool.execute()`.
+
+The ToonForge adapter calls only the local character-animation tools (`character_spec_generator`, `svg_rig_builder`, `pose_library_builder`, `action_timeline_compiler`, `character_rig_renderer`) through `scripts/openmontage_runner.py`. It does not download reference footage and does not fall back to another backend when that render fails.
+
+`pipeline_defs/character-animation.yaml` still requires human approval on several agent stages. ToonForge does not run that agent workflow and does not write fake approvals. See `docs/integrations/openmontage.md`.
+
 ### Ruflo (orchestration)
 
 **Verified capabilities:**
@@ -135,6 +144,7 @@ Also observed: a third-party mirror `Fork-Auto-SocialBots/youtube-automation-age
 | `toonforge` CLI / Node runtime | Product orchestration, MCP, scheduler | n/a (stdio / local) |
 | OmniChar Core (optional) | Character encode/score/generate | 8848 |
 | ReelMimic server (optional) | Reference analysis + production | 4318 |
+| OpenMontage checkout (optional) | Character animation tools via local Python | n/a (subprocess) |
 | Ruflo MCP (optional) | Swarm/memory orchestration | stdio or HTTP |
 | FFmpeg (system) | Probe/assemble/validate media | n/a |
 
@@ -157,7 +167,7 @@ Local-first: unpaid/mocked paths must run without OmniChar/ReelMimic/YouTube cre
 
 ```
 Trend discovery → score/select → original story → character resolve
-  → storyboard → ReelMimic production → audio → captions
+  → storyboard → selected backend (ReelMimic, OpenMontage, or offline fixture) → audio → captions
   → thumbnail → QA (PASS|WARN|BLOCK) → schedule/publish
   → analytics ingest → controlled learning → next decision
 ```

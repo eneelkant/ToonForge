@@ -48,7 +48,31 @@ When OmniChar is used at runtime, operators should retain OmniChar’s copyright
 
 ---
 
-## 3. andrej-karpathy-skills
+## 3. OpenMontage
+
+| Field | Value |
+|-------|--------|
+| Repository | https://github.com/calesthio/OpenMontage |
+| Inspected commit | `9327439db69021ab4b0e2776729bf3b58fdb5a87` |
+| Role in ToonForge | Optional character-animation and local preview render |
+| License file inspected | `LICENSE` — **GNU Affero General Public License v3** |
+| Python requirement inspected | `>=3.10` (`setup.py`, `.python-version`) |
+| GitHub license badge | AGPLv3 |
+
+### Integration posture
+
+- **Compatible approach used here:** optional, separately installed checkout. `scripts/openmontage_runner.py` adds that checkout to `sys.path` and calls published tool classes. ToonForge does not copy OpenMontage source, skills, schemas, or pipeline manifests into this repository.
+- **Not done:** vendoring, static linking, or relicensing ToonForge as AGPL.
+- **Not a legal conclusion:** running OpenMontage in a subprocess does not, by itself, prove that a combined deployment is outside AGPL obligations. Operators who enable OpenMontage must comply with its AGPL-3.0 terms, including source-offer duties that apply to the OpenMontage work they run or convey. This notice is not legal advice.
+- Paid image, video, music, and TTS providers inside OpenMontage are not called by this adapter.
+
+### Attribution
+
+Keep the upstream `LICENSE` with the OpenMontage installation. ToonForge documents the boundary here and in `docs/integrations/openmontage.md`.
+
+---
+
+## 4. andrej-karpathy-skills
 
 | Field | Value |
 |-------|--------|
@@ -66,7 +90,7 @@ When OmniChar is used at runtime, operators should retain OmniChar’s copyright
 
 ---
 
-## 4. youtube-automation-agent (AgentTube / Lumen)
+## 5. youtube-automation-agent (AgentTube / Lumen)
 
 | Field | Value |
 |-------|--------|
@@ -88,7 +112,7 @@ The trailing-dash URL from the original brief does not resolve. Integration is *
 
 ---
 
-## 5. Ruflo
+## 6. Ruflo
 
 | Field | Value |
 |-------|--------|
@@ -111,6 +135,7 @@ The trailing-dash URL from the original brief does not resolve. Integration is *
 | Upstream | License | Apache-2.0 ToonForge distribution |
 |----------|---------|-----------------------------------|
 | OmniChar | GPL-3.0-or-later | **Process isolation only**; do not combine into a single proprietary/Apache binary without legal review |
+| OpenMontage | AGPL-3.0 | **Separate installation only**; do not vendor. Process invocation is not a guarantee of legal separation |
 | ReelMimic | MIT (+ Apache bundled skills) | Compatible with attribution |
 | Karpathy skills | Unverified (README MIT only) | Use as guidance; avoid redistribution until clarified |
 | youtube-automation-agent | MIT | Compatible with attribution |
