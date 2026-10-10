@@ -39,6 +39,13 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (cmd === "openmontage" && sub === "health") {
+    const { createOpenMontageAdapter } = await import("../adapters/openmontage/index.js");
+    const adapter = createOpenMontageAdapter(config.openmontage);
+    console.log(JSON.stringify(await adapter.health(), null, 2));
+    return;
+  }
+
   if (cmd === "reelmimic" && sub === "health") {
     const { createReelMimicAdapter } = await import("../adapters/reelmimic/index.js");
     const adapter = createReelMimicAdapter(config.reelmimic);
@@ -121,6 +128,7 @@ Commands:
   omnichar health
   omnichar list
   reelmimic health
+  openmontage health
   system status
   config channel [path]
   workflow start [name]

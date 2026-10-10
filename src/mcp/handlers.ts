@@ -10,7 +10,8 @@ import {
   discoverTrendsForChannel,
   scoreTrend,
 } from "../engines/trend/index.js";
-import type { PipelineMode } from "../engines/reference/index.js";
+import { resolvePipelineMode, type PipelineMode } from "../engines/reference/index.js";
+import { createOpenMontageAdapter } from "../adapters/openmontage/index.js";
 import { generateOriginalStory, validateStory } from "../engines/story/index.js";
 import { createStoryboard } from "../engines/storyboard/index.js";
 import { produceCartoon } from "../engines/production/index.js";
@@ -25,7 +26,17 @@ import { newId } from "../core/ids.js";
 let paused = false;
 
 export async function handleTool(name: string, args: Record<string, unknown>): Promise<unknown> {
-  if (paused && !["toonforge.resume", "toonforge.system_status", "toonforge.doctor", "toonforge.get_workflow_status"].includes(name)) {
+  if (
+    paused &&
+    ![
+      "toonforge.resume",
+      "toonforge.system_status",
+      "toonforge.doctor",
+      "toonforge.get_workflow_status",
+      "toonforge.openmontage_health",
+      "toonforge.production_backends",
+    ].includes(name)
+  ) {
     return { error: "system paused", code: "PAUSED" };
   }
 
@@ -115,20 +126,48 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
       return validateStory(args.story as never);
     case "toonforge.create_storyboard":
       return createStoryboard(args.story as never);
+    case "toonforge.openmontage_health":
+      return createOpenMontageAdapter(config.openmontage).health();
+    case "toonforge.production_backends": {
+      const openmontage = await createOpenMontageAdapter(config.openmontage).health();
+      const reelmimic = await createReelMimicAdapter(config.reelmimic).probe();
+      return {
+        selected: resolvePipelineMode({
+          reelmimicEnabled: config.reelmimic.enabled,
+          openmontageEnabled: config.openmontage.enabled,
+          preferOfflineFixture: true,
+        }),
+        backends: {
+          offline_fixture: { status: "ready", detail: "explicit ffmpeg_dev fixture" },
+          reelmimic,
+          openmontage,
+        },
+      };
+    }
     case "toonforge.generate_cartoon": {
       const projectId = String(args.projectId ?? newId("proj"));
       const projectDir = String(args.projectDir ?? join(config.dataDir, "projects", projectId));
       mkdirSync(projectDir, { recursive: true });
-      const mode: PipelineMode =
-        args.pipelineMode === "reelmimic" || (config.reelmimic.enabled && args.pipelineMode !== "offline_fixture")
-          ? "reelmimic"
-          : "offline_fixture";
+      const requested = args.pipelineMode;
+      const mode = resolvePipelineMode({
+        reelmimicEnabled: config.reelmimic.enabled,
+        openmontageEnabled: config.openmontage.enabled,
+        mode:
+          requested === "reelmimic" || requested === "openmontage" || requested === "offline_fixture"
+            ? requested
+            : undefined,
+        preferOfflineFixture: true,
+      });
+      const characters =
+        mode === "openmontage" ? await defaultCharacterRegistry().list() : undefined;
       return produceCartoon({
         projectId,
         projectDir,
         story: args.story as never,
         storyboard: args.storyboard as never,
+        characters,
         reelmimic: mode === "reelmimic" ? createReelMimicAdapter(config.reelmimic) : null,
+        openmontage: mode === "openmontage" ? createOpenMontageAdapter(config.openmontage) : null,
         mode,
         referencePath: args.referencePath ? String(args.referencePath) : undefined,
         referenceUrl: args.referenceUrl ? String(args.referenceUrl) : undefined,
@@ -195,7 +234,9 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
         channelPath: args.channelPath ? String(args.channelPath) : undefined,
         dryRun: args.dryRun !== false,
         pipelineMode:
-          args.pipelineMode === "reelmimic" || args.pipelineMode === "offline_fixture"
+          args.pipelineMode === "reelmimic" ||
+          args.pipelineMode === "offline_fixture" ||
+          args.pipelineMode === "openmontage"
             ? (args.pipelineMode as PipelineMode)
             : undefined,
         referencePath: args.referencePath ? String(args.referencePath) : undefined,

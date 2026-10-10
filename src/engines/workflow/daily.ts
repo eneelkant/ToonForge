@@ -15,6 +15,8 @@ import { buildContentPackage } from "../packaging/index.js";
 import { runQa } from "../qa/index.js";
 import { createYoutubeAdapter } from "../../adapters/youtube/index.js";
 import { createReelMimicAdapter } from "../../adapters/reelmimic/index.js";
+import { createOpenMontageAdapter } from "../../adapters/openmontage/index.js";
+import type { OpenMontageAdapter } from "../../adapters/openmontage/types.js";
 import { writeAnalysisReport } from "../../adapters/reelmimic/analyze.js";
 import { SupervisorAgent } from "../../agents/supervisor/index.js";
 import { rootLogger } from "../../core/logging.js";
@@ -27,6 +29,7 @@ import {
 } from "../../core/provenance.js";
 import { muxVideoAudio, writeMediaSidecar } from "../../core/media.js";
 import {
+  buildOfflineFormatAnalysis,
   resolvePipelineMode,
   resolveReference,
   toStoryFormatHints,
@@ -65,10 +68,12 @@ export async function runDailyWorkflow(opts: {
   dryRun?: boolean;
   dataDir?: string;
   publish?: boolean;
-  /** Explicit pipeline mode. When omitted: reelmimic if enabled, else offline_fixture. */
+  /** Explicit pipeline mode. When omitted: channel backend, else reelmimic if enabled, else offline_fixture. */
   pipelineMode?: PipelineMode;
   referencePath?: string;
   referenceUrl?: string;
+  /** Test seam. Production calls create the adapter from runtime config. */
+  openmontage?: OpenMontageAdapter | null;
 }): Promise<DailyWorkflowResult> {
   const config = loadRuntimeConfig();
   assertNotKilled(config);
@@ -79,7 +84,9 @@ export async function runDailyWorkflow(opts: {
   const dryRun = opts.dryRun ?? true;
   const pipelineMode = resolvePipelineMode({
     reelmimicEnabled: config.reelmimic.enabled,
+    openmontageEnabled: config.openmontage.enabled,
     mode: opts.pipelineMode,
+    channelBackend: channel.production_backend,
     preferOfflineFixture: true,
   });
 
@@ -153,7 +160,7 @@ export async function runDailyWorkflow(opts: {
     let analysisReportPath = join(analysisDir, "reference-analysis.json");
     let analysisStub = true;
 
-    if (pipelineMode === "reelmimic") {
+    if (pipelineMode === "reelmimic" || (pipelineMode === "openmontage" && (resolved.referencePath || resolved.referenceUrl) && config.reelmimic.enabled)) {
       if (!resolved.referencePath && !resolved.referenceUrl) {
         throw new Error("ReelMimic mode resolved no video reference");
       }
@@ -167,6 +174,16 @@ export async function runDailyWorkflow(opts: {
       analysisStub = analysis.stub;
     } else if (analysisReport) {
       analysisReportPath = writeAnalysisReport(analysisDir, analysisReport);
+      analysisStub = true;
+    } else if (pipelineMode === "openmontage") {
+      const report = buildOfflineFormatAnalysis(selected);
+      report.notes.push(
+        "Reference was not downloaded. OpenMontage does not fetch third-party footage; ReelMimic analysis is disabled.",
+      );
+      if (resolved.referencePath) report.source_path = resolved.referencePath;
+      if (resolved.referenceUrl) report.source_url = resolved.referenceUrl;
+      analysisReport = report;
+      analysisReportPath = writeAnalysisReport(analysisDir, report);
       analysisStub = true;
     } else {
       throw new Error("Offline fixture missing format analysis report");
@@ -261,28 +278,51 @@ export async function runDailyWorkflow(opts: {
     provenance.timestamps.push(stamp("storyboard.ready"));
 
     record = advance(record, "PRODUCTION");
-    persistWorkflow(projectDir, record);
+    persistWorkflow(projectDir, record, { pipelineMode, backend: pipelineMode });
+    assertNotKilled(config);
+    const openmontage =
+      pipelineMode === "openmontage" ? (opts.openmontage ?? createOpenMontageAdapter(config.openmontage)) : null;
     const production = await produceCartoon({
       projectId,
       projectDir,
       story,
       storyboard,
+      characters,
       reelmimic: pipelineMode === "reelmimic" ? reelmimic : null,
+      openmontage,
       mode: pipelineMode,
       referencePath: resolved.referencePath,
       referenceUrl: resolved.referenceUrl,
       durationSec: Math.min(6, Math.max(2, Math.floor(channel.duration_seconds / 15) || 3)),
     });
+    const videoProvider = production.kind === "reelmimic" ? "reelmimic" : production.kind === "openmontage" ? "openmontage" : "ffmpeg";
     provenance.generatedAssets.push({
       type: "video",
       path: production.videoPath,
       kind: production.kind,
-      provider: production.kind === "reelmimic" ? "reelmimic" : "ffmpeg",
+      provider: videoProvider,
     });
     provenance.providers.push({
-      name: production.kind === "reelmimic" ? "reelmimic" : "ffmpeg-dev",
+      name: production.kind === "ffmpeg_dev" ? "ffmpeg-dev" : videoProvider,
       role: "video",
     });
+    provenance.production = {
+      backend: pipelineMode,
+      upstreamRunId: production.reelmimicProjectId,
+      toolVersions: production.openmontage?.versions,
+      startedAt: production.openmontage?.startedAt,
+      endedAt: production.openmontage?.endedAt,
+      outcome: "validated",
+      retryCount: production.openmontage?.retryCount ?? 0,
+      artifactPaths: [production.videoPath, ...(production.openmontage?.artifactPaths ?? [])],
+      validationStatus: "pass",
+      estimatedCostUsd: production.openmontage?.estimatedCostUsd ?? 0,
+      actualCostUsd: production.openmontage?.actualCostUsd ?? 0,
+      analysisOnly: true,
+      thirdPartyFootageReused: false,
+      thirdPartyAssetsReused: false,
+      approval: production.openmontage?.approval,
+    };
     provenance.timestamps.push(stamp("production.complete"));
 
     record = advance(record, "AUDIO");
@@ -305,14 +345,14 @@ export async function runDailyWorkflow(opts: {
     });
     writeMediaSidecar(assembledPath, {
       kind: production.kind,
-      provider: production.kind === "reelmimic" ? "reelmimic" : "ffmpeg",
+      provider: videoProvider,
       notes: ["assembled final mux", `pipelineMode=${pipelineMode}`],
     });
     provenance.generatedAssets.push({
       type: "video",
       path: assembledPath,
       kind: production.kind,
-      provider: production.kind === "reelmimic" ? "reelmimic" : "ffmpeg",
+      provider: videoProvider,
     });
     const pack = await buildContentPackage({
       projectDir,
@@ -381,6 +421,7 @@ export async function runDailyWorkflow(opts: {
     record = advance(record, "READY_TO_PUBLISH");
     persistWorkflow(projectDir, record);
 
+    assertNotKilled(config);
     const yt = createYoutubeAdapter(config.youtube, {
       dataDir: opts.dataDir ?? config.dataDir,
       dryRunDefault: dryRun,

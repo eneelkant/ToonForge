@@ -1,5 +1,6 @@
 # ToonForge production image (Apache-2.0)
-# Does NOT bundle OmniChar (GPL) or ReelMimic — connect via network/env.
+# Does NOT bundle OmniChar (GPL), ReelMimic, or OpenMontage (AGPL-3.0).
+# Connect those optional backends as separate installations.
 FROM node:22.14-bookworm-slim
 
 RUN apt-get update \

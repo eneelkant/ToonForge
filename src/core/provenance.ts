@@ -33,7 +33,25 @@ export interface ProvenanceRecord {
   originalContent: boolean;
   thirdPartyFootage: boolean;
   policyNotes: string[];
-  pipelineMode?: "offline_fixture" | "reelmimic";
+  pipelineMode?: "offline_fixture" | "reelmimic" | "openmontage";
+  production?: {
+    backend: "offline_fixture" | "reelmimic" | "openmontage";
+    upstreamRunId?: string;
+    toolVersions?: Record<string, string>;
+    startedAt?: string;
+    endedAt?: string;
+    outcome?: string;
+    retryCount?: number;
+    artifactPaths?: string[];
+    validationStatus?: string;
+    errorClass?: string;
+    estimatedCostUsd?: number;
+    actualCostUsd?: number;
+    analysisOnly?: boolean;
+    thirdPartyFootageReused?: boolean;
+    thirdPartyAssetsReused?: boolean;
+    approval?: string;
+  };
 }
 
 export function emptyProvenance(): ProvenanceRecord {

@@ -7,7 +7,7 @@ import { ToonForgeError } from "./errors.js";
 const execFileAsync = promisify(execFile);
 
 /** Artifact provenance kinds — never conflate invalid stubs with real media. */
-export type MediaKind = "reelmimic" | "ffmpeg_dev" | "provider" | "invalid_stub" | "unknown";
+export type MediaKind = "reelmimic" | "openmontage" | "ffmpeg_dev" | "provider" | "invalid_stub" | "unknown";
 
 export interface ProbeStream {
   codec_type?: string;
@@ -510,7 +510,7 @@ export async function generateDevThumbnail(opts: {
 
 /** True when artifact is allowed for live YouTube upload. */
 export function isProductionMediaKind(kind: MediaKind): boolean {
-  return kind === "reelmimic" || kind === "provider";
+  return kind === "reelmimic" || kind === "openmontage" || kind === "provider";
 }
 
 export function sidecarPath(mediaPath: string): string {
