@@ -72,7 +72,14 @@ export function createYoutubeAdapter(
     const idempotencyKey =
       req.idempotencyKey || publishIdempotencyKey(req.projectId, req.videoId);
     const existing = loadManifest(dataDir, idempotencyKey);
-    if (existing && (existing.publishStatus === "published" || existing.publishStatus === "scheduled" || existing.publishStatus === "dry_run")) {
+    if (
+      existing &&
+      (existing.publishStatus === "published" ||
+        existing.publishStatus === "scheduled" ||
+        existing.publishStatus === "dry_run" ||
+        existing.publishStatus === "reconciliation_required" ||
+        Boolean(existing.youtubeId))
+    ) {
       log.info("youtube.idempotent_hit", { idempotencyKey, status: existing.publishStatus });
       return {
         youtubeId: existing.youtubeId,

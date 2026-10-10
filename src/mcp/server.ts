@@ -14,6 +14,8 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { handleTool, listPrompts, listResources, readResource } from "./handlers.js";
+import { toolSchemaJson } from "./validate.js";
+import { ToonForgeError } from "../core/errors.js";
 
 export const MCP_TOOL_NAMES = [
   "toonforge.system_status",
@@ -47,19 +49,14 @@ export const MCP_TOOL_NAMES = [
   "toonforge.get_workflow_status",
   "toonforge.pause",
   "toonforge.resume",
+  "toonforge.setup_status",
+  "toonforge.youtube_status",
+  "toonforge.scheduler_status",
+  "toonforge.scheduler_preview",
+  "toonforge.publish_preflight",
+  "toonforge.pause_channel",
+  "toonforge.resume_channel",
 ] as const;
-
-function toolDef(name: string, description: string, properties: Record<string, unknown> = {}) {
-  return {
-    name,
-    description,
-    inputSchema: {
-      type: "object" as const,
-      properties,
-      additionalProperties: true,
-    },
-  };
-}
 
 export function createToonForgeMcpServer(): Server {
   const server = new Server(
@@ -67,57 +64,53 @@ export function createToonForgeMcpServer(): Server {
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
 
+  const descriptions: Record<string, string> = {
+    "toonforge.system_status": "Adapter/config/budget status",
+    "toonforge.doctor": "Environment doctor checks",
+    "toonforge.discover_trends": "Discover cartoon-suitable trend candidates",
+    "toonforge.analyze_reference": "Analyze reference structure (not copy assets)",
+    "toonforge.score_trends": "Score trend metrics",
+    "toonforge.list_characters": "List canonical characters",
+    "toonforge.get_character": "Get one character",
+    "toonforge.validate_character": "Validate character + optional OmniChar continuity",
+    "toonforge.select_characters": "Resolve characters for a story",
+    "toonforge.generate_story": "Generate an original story",
+    "toonforge.validate_story": "Validate story completeness/originality flags",
+    "toonforge.create_storyboard": "Build deterministic storyboard",
+    "toonforge.generate_cartoon": "Produce cartoon artifact (offline fixture, ReelMimic, or OpenMontage)",
+    "toonforge.openmontage_health": "OpenMontage install and probe status",
+    "toonforge.production_backends": "Availability of offline, ReelMimic, and OpenMontage backends",
+    "toonforge.review_video": "Alias of run_qa",
+    "toonforge.generate_voice": "Generate voice audio bundle",
+    "toonforge.generate_music": "Generate music/mix bundle",
+    "toonforge.generate_captions": "Generate captions package",
+    "toonforge.generate_thumbnail": "Generate thumbnail package",
+    "toonforge.generate_metadata": "Generate metadata package",
+    "toonforge.run_qa": "Run QA gates",
+    "toonforge.prepare_publish": "Prepare publication. Live upload also requires the operator opt-in.",
+    "toonforge.schedule_publish": "Schedule publish. Live upload also requires the operator opt-in.",
+    "toonforge.publish_video": "Publish video. dryRun false alone cannot enable a live upload.",
+    "toonforge.get_video_status": "Read publication manifest",
+    "toonforge.get_analytics": "Fetch analytics if configured",
+    "toonforge.run_daily_workflow": "Run resumable daily workflow. Defaults to dry-run.",
+    "toonforge.get_workflow_status": "Orchestrator workflow status",
+    "toonforge.pause": "Pause irreversible MCP actions and the persistent scheduler",
+    "toonforge.resume": "Resume MCP actions and the persistent scheduler",
+    "toonforge.setup_status": "Dependency and setup status without writing client config",
+    "toonforge.youtube_status": "YouTube authorization status without secrets",
+    "toonforge.scheduler_status": "Persistent scheduler jobs and pause state",
+    "toonforge.scheduler_preview": "Next local schedule instants. Does not generate or publish.",
+    "toonforge.publish_preflight": "Channel, privacy, schedule, backend, and live-publish blockers",
+    "toonforge.pause_channel": "Pause one channel id in the scheduler",
+    "toonforge.resume_channel": "Resume one channel id in the scheduler",
+  };
+
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [
-      toolDef("toonforge.system_status", "Adapter/config/budget status"),
-      toolDef("toonforge.doctor", "Environment doctor checks"),
-      toolDef("toonforge.discover_trends", "Discover cartoon-suitable trend candidates", {
-        channelPath: { type: "string" },
-        limit: { type: "number" },
-      }),
-      toolDef("toonforge.analyze_reference", "Analyze reference structure (not copy assets)", {
-        sourcePath: { type: "string" },
-        sourceUrl: { type: "string" },
-        outDir: { type: "string" },
-      }),
-      toolDef("toonforge.score_trends", "Score trend metrics"),
-      toolDef("toonforge.list_characters", "List canonical characters"),
-      toolDef("toonforge.get_character", "Get one character", { characterId: { type: "string" } }),
-      toolDef("toonforge.validate_character", "Validate character + optional OmniChar continuity", {
-        characterId: { type: "string" },
-      }),
-      toolDef("toonforge.select_characters", "Resolve characters for a story"),
-      toolDef("toonforge.generate_story", "Generate an original story"),
-      toolDef("toonforge.validate_story", "Validate story completeness/originality flags"),
-      toolDef("toonforge.create_storyboard", "Build deterministic storyboard"),
-      toolDef("toonforge.generate_cartoon", "Produce cartoon artifact (offline fixture, ReelMimic, or OpenMontage)", {
-        pipelineMode: { type: "string", enum: ["offline_fixture", "reelmimic", "openmontage"] },
-      }),
-      toolDef("toonforge.openmontage_health", "OpenMontage install and probe status"),
-      toolDef("toonforge.production_backends", "Availability of offline, ReelMimic, and OpenMontage backends"),
-      toolDef("toonforge.review_video", "Alias of run_qa"),
-      toolDef("toonforge.generate_voice", "Generate voice audio bundle"),
-      toolDef("toonforge.generate_music", "Generate music/mix bundle"),
-      toolDef("toonforge.generate_captions", "Generate captions package"),
-      toolDef("toonforge.generate_thumbnail", "Generate thumbnail package"),
-      toolDef("toonforge.generate_metadata", "Generate metadata package"),
-      toolDef("toonforge.run_qa", "Run QA gates"),
-      toolDef("toonforge.prepare_publish", "Prepare publication (dry-run by default)"),
-      toolDef("toonforge.schedule_publish", "Schedule publish (dry-run by default)"),
-      toolDef("toonforge.publish_video", "Publish video (dry-run by default)"),
-      toolDef("toonforge.get_video_status", "Read publication manifest"),
-      toolDef("toonforge.get_analytics", "Fetch analytics if configured"),
-      toolDef("toonforge.run_daily_workflow", "Run resumable daily dry-run workflow", {
-        channelPath: { type: "string" },
-        dryRun: { type: "boolean" },
-        pipelineMode: { type: "string", enum: ["offline_fixture", "reelmimic", "openmontage"] },
-      }),
-      toolDef("toonforge.get_workflow_status", "Orchestrator workflow status", {
-        workflowId: { type: "string" },
-      }),
-      toolDef("toonforge.pause", "Pause irreversible MCP actions"),
-      toolDef("toonforge.resume", "Resume MCP actions"),
-    ],
+    tools: MCP_TOOL_NAMES.map((name) => ({
+      name,
+      description: descriptions[name] ?? name,
+      inputSchema: toolSchemaJson(name),
+    })),
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -130,11 +123,14 @@ export function createToonForgeMcpServer(): Server {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
     } catch (error) {
+      const typed = error instanceof ToonForgeError ? error.toJSON() : undefined;
       const payload = {
         error: true,
         tool: name,
-        code: (error as { code?: string })?.code ?? "TOOL_ERROR",
+        code: typed?.code ?? "TOOL_ERROR",
         message: error instanceof Error ? error.message : String(error),
+        retryable: typed?.retryable ?? false,
+        remediation: typed?.context && typeof typed.context === "object" ? (typed.context as { remediation?: string }).remediation : undefined,
       };
       return {
         isError: true,

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- User LaunchAgent template. Copy to ~/Library/LaunchAgents and adjust paths.
+     This file is not installed by toonforge setup. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.toonforge.scheduler</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>toonforge</string>
+    <string>scheduler</string>
+    <string>start</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>YOUTUBE_DRY_RUN</key>
+    <string>true</string>
+  </dict>
+</dict>
+</plist>

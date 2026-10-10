@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ToonForgeError } from "../core/errors.js";
 import type { CharacterRecord, CharacterRegistry } from "./types.js";
 
@@ -112,5 +113,11 @@ export class FileCharacterRegistry implements CharacterRegistry {
 }
 
 export function defaultCharacterRegistry(cwd = process.cwd()): FileCharacterRegistry {
-  return new FileCharacterRegistry(resolve(cwd, "characters"));
+  if (process.env.TOONFORGE_CHARACTERS_DIR) {
+    return new FileCharacterRegistry(resolve(process.env.TOONFORGE_CHARACTERS_DIR));
+  }
+  const local = resolve(cwd, "characters");
+  if (existsSync(local)) return new FileCharacterRegistry(local);
+  const bundled = resolve(dirname(fileURLToPath(import.meta.url)), "../../characters");
+  return new FileCharacterRegistry(existsSync(bundled) ? bundled : local);
 }

@@ -74,16 +74,37 @@ npm run cli -- omnichar health
 
 ### YouTube OAuth
 
-1. Create a Google Cloud OAuth desktop client.
-2. Set `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET`.
-3. Complete OAuth and store the refresh token at `YOUTUBE_TOKEN_PATH` (never commit).
-4. Keep `YOUTUBE_DRY_RUN=true` until QA + provenance + media validation all PASS with **production** media (`reelmimic` / `provider` kinds — not `ffmpeg_dev`).
+1. Create a Google Cloud OAuth desktop client and enable YouTube Data API v3.
+2. Set the redirect to a loopback URL with a port, for example `http://127.0.0.1:53682/`.
+3. Set `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REDIRECT_URI`.
+4. Run `node dist/cli/index.js youtube connect`. The CLI opens Google's authorization page and stores the refresh token under `YOUTUBE_TOKEN_PATH` and `data/youtube/tokens/<channelId>.json` (mode 0600). It never asks for a Google password.
+5. Confirm with `youtube status` (`authClass: ready`) and `youtube channels`.
 
-Live publish:
+Keep `YOUTUBE_DRY_RUN=true` until QA, provenance, and media validation all PASS with production media (`reelmimic` or `openmontage` — not `ffmpeg_dev`).
+
+Live publish needs both the environment flag and the operator opt-in file:
 
 ```bash
-YOUTUBE_DRY_RUN=false npm run cli -- workflow run daily --publish
+node dist/cli/index.js publish enable-live --i-understand
+YOUTUBE_DRY_RUN=false node dist/cli/index.js workflow run daily --publish
 ```
+
+`publish enable-live` alone does nothing while `YOUTUBE_DRY_RUN` is still true. MCP `dryRun: false` cannot create the opt-in file.
+
+## Scheduler
+
+`toonforge scheduler start` reads the channel cron (`"<minute> <hour> * * *"`) in the channel IANA timezone and persists jobs under `TOONFORGE_DATA_DIR/scheduler`. Use a persistent disk for that directory. Two processes take a file lock so they do not run the same job. Default channel schedules are disabled, and unattended jobs stay in dry-run until live publishing is opted in.
+
+User service templates are in `config/services/`. The installer does not register them and does not use sudo.
+
+```bash
+node dist/cli/index.js scheduler preview
+node dist/cli/index.js scheduler start --once
+```
+
+## HTTP MCP
+
+`toonforge mcp --http` listens on `127.0.0.1` and requires `TOONFORGE_MCP_TOKEN`. Terminate TLS on a reverse proxy if ChatGPT Developer Mode must reach it. Do not publish port 8787 on `0.0.0.0`.
 
 ## Docker
 
@@ -115,17 +136,21 @@ Live upload requires:
 - provenance complete + original content
 - no third-party footage
 - kill switch off
-- `YOUTUBE_DRY_RUN=false`
-- OAuth credentials present
-- media kind is production-ready
+- `YOUTUBE_DRY_RUN=false` and `data/live-publish.opt-in.json` from `publish enable-live --i-understand`
+- OAuth credentials present for the selected channel id
+- media kind is production-ready (`ffmpeg_dev` blocked)
+- selected backend is not `offline_fixture`
 
 ## Monitoring
 
 ```bash
-npm run cli -- system status
-npm run doctor
-# structured logs include workflowId, projectId, channelId, state, QA verdict
+node dist/cli/index.js doctor
+node dist/cli/index.js youtube status
+node dist/cli/index.js scheduler status
+node dist/cli/index.js publish preflight
 ```
+
+Structured logs go to stderr and redact tokens. They include workflow id, project id, channel id, state, and QA verdict when the workflow emits them.
 
 ## Multi-channel
 

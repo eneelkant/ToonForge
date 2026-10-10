@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { loadRuntimeConfig } from "../core/config.js";
+import { evaluateDependencies } from "../setup/dependencies.js";
 import { getSystemStatus } from "../mcp/tools/system.js";
 
 const execFileAsync = promisify(execFile);
@@ -170,6 +171,17 @@ export async function runDoctor(): Promise<void> {
       name: "provider:youtube-trends",
       severity: "PASS",
       detail: `configured region=${ytTrends.regionCode} maxResults=${ytTrends.maxResults} key=present`,
+    });
+  }
+
+  const dependencies = await evaluateDependencies({ platform: process.platform });
+  for (const dep of dependencies) {
+    const severity: Severity = dep.status === "pass" ? "PASS" : dep.required ? "FAIL" : "WARN";
+    checks.push({
+      name: `dep:${dep.id}`,
+      severity,
+      detail: `${dep.status}: ${dep.detail}`,
+      remediation: dep.status === "pass" ? undefined : dep.install,
     });
   }
 

@@ -51,6 +51,7 @@ export interface RuntimeConfig {
   perVideoBudgetUsd: number;
   maxConcurrentJobs: number;
   maxRetries: number;
+  mcpMaxBytes: number;
   omnichar: {
     enabled: boolean;
     baseUrl: string;
@@ -94,6 +95,7 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     perVideoBudgetUsd: Number(env.TOONFORGE_PER_VIDEO_BUDGET_USD || 5),
     maxConcurrentJobs: Number(env.TOONFORGE_MAX_CONCURRENT_JOBS || 1),
     maxRetries: Number(env.TOONFORGE_MAX_RETRIES || 3),
+    mcpMaxBytes: positiveInt(env.TOONFORGE_MCP_MAX_BYTES, 262_144),
     omnichar: {
       enabled: env.OMNICHAR_ENABLED === "true",
       baseUrl: env.OMNICHAR_BASE_URL || "http://127.0.0.1:8848",

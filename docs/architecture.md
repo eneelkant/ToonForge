@@ -1,15 +1,17 @@
 # ToonForge Architecture
 
-**Status:** Phase 1–2 audit complete; Phase 3–4 foundation in progress  
+**Status:** Node.js CLI, MCP server, dry-run workflow, optional ReelMimic and OpenMontage adapters, YouTube OAuth adapter, and a file-backed scheduler.  
 **Repo license:** Apache-2.0  
-**Primary language:** TypeScript (Node.js ≥ 22.18)  
-**Date of audit:** 2026-10-07
+**Primary language:** TypeScript (Node.js ≥ 22.14)  
+**Capability detail:** [capabilities.md](capabilities.md)
+
+The sections below include the original 2026-10-07 upstream audit. Where they say a stage was not built yet, prefer `src/` and [capabilities.md](capabilities.md).
 
 ---
 
-## 1. Current ToonForge architecture
+## 1. Historical starting point
 
-Before this foundation branch, ToonForge contained only:
+Before the foundation work, ToonForge contained only:
 
 | Path | Notes |
 |------|--------|

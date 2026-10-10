@@ -1,6 +1,6 @@
 # Integration / Dependency Matrix
 
-Audited 2026-10-07. Status values:
+System commands checked by `toonforge doctor` and `toonforge setup` are listed in `config/dependencies.json` (Node.js, ffmpeg, ffprobe, optional python3, optional git). That file is the installer source of truth. The table below is the upstream product matrix. Status values:
 
 - `available` — repo reachable and inspected
 - `resolved` — URL corrected from brief

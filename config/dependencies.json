@@ -1,0 +1,70 @@
+[
+  {
+    "id": "node",
+    "required": true,
+    "platforms": ["darwin", "linux", "win32"],
+    "versionRange": ">=22.14.0",
+    "detect": { "command": "node", "args": ["-v"] },
+    "why": "Runs the ToonForge CLI, MCP server, and scheduler.",
+    "license": "MIT",
+    "disk": "Application install is typically under 200 MB plus user media.",
+    "install": {
+      "darwin": "Install Node.js 22 from https://nodejs.org/ or Homebrew (brew install node@22). ToonForge does not run an unpinned install script.",
+      "linux": "Install Node.js 22 from your distribution or https://nodejs.org/. ToonForge does not pipe a remote shell script.",
+      "win32": "Install Node.js 22 from https://nodejs.org/."
+    }
+  },
+  {
+    "id": "ffmpeg",
+    "required": true,
+    "platforms": ["darwin", "linux", "win32"],
+    "detect": { "command": "ffmpeg", "args": ["-version"] },
+    "why": "Builds and validates short test media, captions muxing, and thumbnails.",
+    "license": "GPL/LGPL build-dependent. Install the official FFmpeg package for your OS; ToonForge does not vendor FFmpeg.",
+    "install": {
+      "darwin": "brew install ffmpeg",
+      "linux": "Use your distro package (for example apt install ffmpeg). Root may be required for the system package manager.",
+      "win32": "Install FFmpeg from https://ffmpeg.org/download.html and add it to PATH."
+    }
+  },
+  {
+    "id": "ffprobe",
+    "required": true,
+    "platforms": ["darwin", "linux", "win32"],
+    "detect": { "command": "ffprobe", "args": ["-version"] },
+    "why": "Validates container, codec, duration, and streams before any publish gate.",
+    "license": "Ships with FFmpeg.",
+    "install": {
+      "darwin": "Installed with FFmpeg.",
+      "linux": "Installed with the FFmpeg package.",
+      "win32": "Installed with FFmpeg. Confirm ffprobe.exe is on PATH."
+    }
+  },
+  {
+    "id": "python3",
+    "required": false,
+    "platforms": ["darwin", "linux", "win32"],
+    "versionRange": ">=3.10.0",
+    "detect": { "command": "python3", "args": ["--version"] },
+    "why": "Optional. Required only if you enable the separate OpenMontage or ReelMimic Python tools.",
+    "license": "PSF. Not bundled.",
+    "install": {
+      "darwin": "brew install python@3.12",
+      "linux": "Use your distro python3 package.",
+      "win32": "Install Python 3.10+ from https://www.python.org/downloads/ and enable the py launcher if you use it."
+    }
+  },
+  {
+    "id": "git",
+    "required": false,
+    "platforms": ["darwin", "linux", "win32"],
+    "detect": { "command": "git", "args": ["--version"] },
+    "why": "Optional. Useful for development checkouts. Not required to run an installed ToonForge package.",
+    "license": "GPL-2.0",
+    "install": {
+      "darwin": "xcode-select --install or brew install git",
+      "linux": "Use your distro git package.",
+      "win32": "Install Git for Windows from https://git-scm.com/download/win."
+    }
+  }
+]

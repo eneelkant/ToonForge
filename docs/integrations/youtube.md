@@ -52,4 +52,28 @@ Publishing requires:
 
 ## OAuth
 
-Desktop OAuth client + token file at `YOUTUBE_TOKEN_PATH`. Token contents are never logged.
+Desktop OAuth client. Redirect URI must be `http://127.0.0.1` or `http://localhost` with a port other than 80.
+
+```bash
+node dist/cli/index.js youtube connect
+node dist/cli/index.js youtube status
+node dist/cli/index.js youtube channels
+node dist/cli/index.js youtube test
+node dist/cli/index.js youtube disconnect --channel CHANNEL_ID
+```
+
+`youtube connect` uses a loopback listener, a random `state` value checked with `timingSafeEqual`, and a bounded timeout. The browser opener only launches `https://accounts.google.com/...` as an argument to `open`, `xdg-open`, or `cmd /c start`. Scopes are `https://www.googleapis.com/auth/youtube.readonly` and `https://www.googleapis.com/auth/youtube.upload`.
+
+Tokens are written to `YOUTUBE_TOKEN_PATH` and `data/youtube/tokens/<channelId>.json` with mode `0600` when the platform supports it. `data/youtube/accounts.json` records channel id, title, scopes, and path. Status JSON never includes token strings. One token file maps to one channel id. Knowing a channel id is not treated as write access; `channels.list(mine=true)` must return that channel.
+
+`authClass` is one of: `ready`, `oauth_app_missing`, `authorization_incomplete`, `token_expired`, `insufficient_scope`, `channel_unavailable`, `quota_exceeded`, `verification_required`.
+
+Google's verification, testing-mode user list, and quota are not bypassed. Tests use injected fake token exchanges. CI does not call Google.
+
+## Idempotent upload
+
+A manifest in `published`, `scheduled`, `dry_run`, or `reconciliation_required`, or any manifest that already has a `youtubeId`, is not uploaded again. Unknown outcomes stay in `reconciliation_required` until a later status read resolves them.
+
+## Live gate
+
+Live upload requires `YOUTUBE_DRY_RUN=false` and `data/live-publish.opt-in.json` (`publish enable-live --i-understand`). Token contents are never logged.

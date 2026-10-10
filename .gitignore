@@ -29,3 +29,4 @@ tmp/
 .inline/
 .inline-assets/
 *.char.bak
+*.tgz

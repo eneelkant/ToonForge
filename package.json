@@ -10,6 +10,17 @@
   "bin": {
     "toonforge": "./dist/cli/index.js"
   },
+  "files": [
+    "dist",
+    "characters",
+    "config",
+    "scripts/openmontage_runner.py",
+    "scripts/bootstrap.mjs",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "docs"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

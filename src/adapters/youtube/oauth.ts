@@ -147,15 +147,16 @@ export function createGoogleYoutubeClient(config: RuntimeConfig["youtube"]): You
   };
 }
 
-export function getAuthUrl(config: RuntimeConfig["youtube"]): string {
+export function getAuthUrl(config: RuntimeConfig["youtube"], state?: string): string {
   const auth = createOAuth2Client(config);
   return auth.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
+    include_granted_scopes: false,
+    state,
     scope: [
+      "https://www.googleapis.com/auth/youtube.readonly",
       "https://www.googleapis.com/auth/youtube.upload",
-      "https://www.googleapis.com/auth/youtube",
-      "https://www.googleapis.com/auth/youtube.force-ssl",
     ],
   });
 }
