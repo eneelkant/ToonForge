@@ -1,0 +1,13 @@
+[Unit]
+Description=ToonForge scheduler
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env toonforge scheduler start
+Restart=on-failure
+# Run as the operator. Do not install this unit with root unless you intend a system service.
+# Copy to ~/.config/systemd/user/ and start with: systemctl --user start toonforge-scheduler
+
+[Install]
+WantedBy=default.target

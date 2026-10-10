@@ -90,7 +90,7 @@ export async function assertPublishable(req: YoutubeUploadRequest): Promise<void
     if (!isProductionMediaKind(kind) && kind !== "unknown") {
       throw new ToonForgeError({
         code: "POLICY_VIOLATION",
-        message: `Live publish refuses media kind=${kind} (need reelmimic/provider)`,
+        message: `Live publish refuses media kind=${kind} (need reelmimic, openmontage, or provider)`,
         component: "adapters.youtube.gates",
         context: { kind },
       });

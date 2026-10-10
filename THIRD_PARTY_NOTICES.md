@@ -4,7 +4,7 @@ ToonForge itself is licensed under the **Apache License 2.0** (see `LICENSE`).
 
 This file documents upstream projects inspected for integration. License claims below are based on **files and GitHub metadata inspected on 2026-10-07**. Do not treat this as legal advice.
 
-ToonForge does **not** vendor upstream source trees into this repository in the foundation phase. Adapters call external processes/APIs where integration is needed.
+ToonForge does **not** vendor upstream source trees. Adapters call external processes or APIs. The installer (`scripts/bootstrap.mjs`, `toonforge setup`) does not download OmniChar, ReelMimic, or OpenMontage and does not run third-party install scripts. `scripts/openmontage_runner.py` is a ToonForge-owned process wrapper, not a copy of OpenMontage.
 
 ---
 

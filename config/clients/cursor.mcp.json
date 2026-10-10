@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "toonforge": {
+      "command": "toonforge",
+      "args": ["mcp"],
+      "env": {
+        "YOUTUBE_DRY_RUN": "true",
+        "TOONFORGE_LOG_LEVEL": "error"
+      }
+    }
+  }
+}

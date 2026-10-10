@@ -1,4 +1,11 @@
 import { loadChannelConfig, loadRuntimeConfig } from "../core/config.js";
+import { defaultChannelPath } from "../core/paths.js";
+import { resolvePublishMode } from "../core/publish-mode.js";
+import { youtubeStatus } from "../adapters/youtube/account.js";
+import { publishPreflight } from "../engines/publish/preflight.js";
+import { pauseChannel, pauseGlobal, previewChannel, resumeChannel, resumeGlobal, schedulerStatus } from "../scheduler/index.js";
+import { runSetup } from "../setup/index.js";
+import { validateToolArgs } from "./validate.js";
 import { defaultCharacterRegistry } from "../characters/registry.js";
 import { getSystemStatus } from "./tools/system.js";
 import { runDoctor } from "../cli/doctor.js";
@@ -25,22 +32,26 @@ import { newId } from "../core/ids.js";
 
 let paused = false;
 
-export async function handleTool(name: string, args: Record<string, unknown>): Promise<unknown> {
-  if (
-    paused &&
-    ![
-      "toonforge.resume",
-      "toonforge.system_status",
-      "toonforge.doctor",
-      "toonforge.get_workflow_status",
-      "toonforge.openmontage_health",
-      "toonforge.production_backends",
-    ].includes(name)
-  ) {
+const STATUS_TOOLS = new Set([
+  "toonforge.resume",
+  "toonforge.system_status",
+  "toonforge.doctor",
+  "toonforge.get_workflow_status",
+  "toonforge.openmontage_health",
+  "toonforge.production_backends",
+  "toonforge.setup_status",
+  "toonforge.youtube_status",
+  "toonforge.scheduler_status",
+  "toonforge.scheduler_preview",
+  "toonforge.publish_preflight",
+]);
+
+export async function handleTool(name: string, rawArgs: Record<string, unknown>): Promise<unknown> {
+  const config = loadRuntimeConfig();
+  if (paused && !STATUS_TOOLS.has(name)) {
     return { error: "system paused", code: "PAUSED" };
   }
-
-  const config = loadRuntimeConfig();
+  const args = validateToolArgs(name, rawArgs, config.mcpMaxBytes);
 
   switch (name) {
     case "toonforge.system_status":
@@ -59,7 +70,7 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
       return { lines };
     }
     case "toonforge.discover_trends": {
-      const channel = loadChannelConfig(String(args.channelPath ?? "config/channels/cartoon-default.yaml"));
+      const channel = loadChannelConfig(String(args.channelPath ?? defaultChannelPath()));
       const { trends, providers } = await discoverTrendsForChannel({
         trendSources: channel.trend_sources,
         niche: channel.niche,
@@ -109,7 +120,7 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
       return { local, continuity };
     }
     case "toonforge.generate_story": {
-      const channel = loadChannelConfig(String(args.channelPath ?? "config/channels/cartoon-default.yaml"));
+      const channel = loadChannelConfig(String(args.channelPath ?? defaultChannelPath()));
       const characters = await defaultCharacterRegistry().resolve_for_story({
         roles: ["lead", "sidekick"],
         preferredIds: (args.characterIds as string[]) ?? channel.characters,
@@ -204,13 +215,14 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
     case "toonforge.prepare_publish":
     case "toonforge.schedule_publish":
     case "toonforge.publish_video": {
+      const mode = resolvePublishMode({ config, requestedLive: args.dryRun === false });
       const yt = createYoutubeAdapter(config.youtube, { dryRunDefault: true });
-      return yt.publish({
+      const result = await yt.publish({
         idempotencyKey: String(args.idempotencyKey ?? `pub:${args.projectId}:${args.videoId}`),
         projectId: String(args.projectId),
         videoId: String(args.videoId ?? "video"),
         videoPath: String(args.videoPath),
-        dryRun: args.dryRun !== false,
+        dryRun: mode.dryRun,
         workflowState: String(args.workflowState ?? "READY_TO_PUBLISH"),
         qaStatus: (args.qaStatus as "PASS" | "FAIL" | "WARN") ?? "PASS",
         policyStatus: "PASS",
@@ -222,17 +234,39 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
           notes: [],
         },
       });
+      return { ...result, publishMode: mode };
     }
+    case "toonforge.setup_status":
+      return runSetup({ home: process.env.HOME || process.cwd(), platform: process.platform, apply: false, nonInteractive: true, dataDir: config.dataDir });
+    case "toonforge.youtube_status":
+      return youtubeStatus(config);
+    case "toonforge.scheduler_status":
+      return { ...schedulerStatus(config.dataDir), killSwitch: config.killSwitch, livePublishingEnabled: resolvePublishMode({ config, requestedLive: true }).liveAllowed };
+    case "toonforge.scheduler_preview": {
+      const channel = loadChannelConfig(String(args.channelPath ?? defaultChannelPath()));
+      return previewChannel(channel, new Date(), Number(args.count ?? 3));
+    }
+    case "toonforge.publish_preflight": {
+      const channel = loadChannelConfig(String(args.channelPath ?? defaultChannelPath()));
+      return publishPreflight(config, channel);
+    }
+    case "toonforge.pause_channel":
+      pauseChannel(config.dataDir, String(args.channelId));
+      return { paused: true, channelId: args.channelId };
+    case "toonforge.resume_channel":
+      resumeChannel(config.dataDir, String(args.channelId));
+      return { paused: false, channelId: args.channelId };
     case "toonforge.get_video_status": {
       const yt = createYoutubeAdapter(config.youtube);
       return yt.getManifest(String(args.idempotencyKey));
     }
     case "toonforge.get_analytics":
       return { status: "pending", note: "Requires live YouTube analytics credentials" };
-    case "toonforge.run_daily_workflow":
-      return runDailyWorkflow({
+    case "toonforge.run_daily_workflow": {
+      const mode = resolvePublishMode({ config, requestedLive: args.dryRun === false });
+      const result = await runDailyWorkflow({
         channelPath: args.channelPath ? String(args.channelPath) : undefined,
-        dryRun: args.dryRun !== false,
+        dryRun: mode.dryRun,
         pipelineMode:
           args.pipelineMode === "reelmimic" ||
           args.pipelineMode === "offline_fixture" ||
@@ -242,16 +276,20 @@ export async function handleTool(name: string, args: Record<string, unknown>): P
         referencePath: args.referencePath ? String(args.referencePath) : undefined,
         referenceUrl: args.referenceUrl ? String(args.referenceUrl) : undefined,
       });
+      return { ...result, publishMode: mode };
+    }
     case "toonforge.get_workflow_status": {
       const orch = createOrchestrator(config.ruflo);
       return orch.workflow.status(String(args.workflowId));
     }
     case "toonforge.pause":
       paused = true;
-      return { paused: true };
+      pauseGlobal(config.dataDir);
+      return { paused: true, persistent: true };
     case "toonforge.resume":
       paused = false;
-      return { paused: false };
+      resumeGlobal(config.dataDir);
+      return { paused: false, persistent: true };
     case "toonforge.select_characters": {
       return defaultCharacterRegistry().resolve_for_story({
         roles: (args.roles as string[]) ?? ["lead"],
@@ -275,7 +313,7 @@ export function listResources() {
 export async function readResource(uri: string): Promise<string> {
   if (uri === "toonforge://channel/cartoon-default") {
     const { readFileSync } = await import("node:fs");
-    return readFileSync("config/channels/cartoon-default.yaml", "utf8");
+    return readFileSync(defaultChannelPath(), "utf8");
   }
   if (uri === "toonforge://characters") {
     return JSON.stringify(await defaultCharacterRegistry().list(), null, 2);

@@ -1,6 +1,10 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { loadChannelConfig, loadRuntimeConfig, assertNotKilled } from "../../core/config.js";
+import { defaultChannelPath } from "../../core/paths.js";
+import { resolvePublishMode } from "../../core/publish-mode.js";
+import { ToonForgeError } from "../../core/errors.js";
+import { youtubeStatus } from "../../adapters/youtube/account.js";
 import { newId } from "../../core/ids.js";
 import { transition, type WorkflowRecord, type WorkflowState } from "../../core/state.js";
 import { defaultCharacterRegistry } from "../../characters/registry.js";
@@ -72,6 +76,8 @@ export async function runDailyWorkflow(opts: {
   pipelineMode?: PipelineMode;
   referencePath?: string;
   referenceUrl?: string;
+  projectId?: string;
+  workflowId?: string;
   /** Test seam. Production calls create the adapter from runtime config. */
   openmontage?: OpenMontageAdapter | null;
 }): Promise<DailyWorkflowResult> {
@@ -80,8 +86,13 @@ export async function runDailyWorkflow(opts: {
   const supervisor = new SupervisorAgent(config);
   supervisor.checkBudget({ dailySpentUsd: 0, videoSpentUsd: 0 }, 0);
 
-  const channel = loadChannelConfig(opts.channelPath ?? "config/channels/cartoon-default.yaml");
-  const dryRun = opts.dryRun ?? true;
+  const channel = loadChannelConfig(opts.channelPath ?? defaultChannelPath());
+  const publishMode = resolvePublishMode({
+    config,
+    dataDir: opts.dataDir,
+    requestedLive: opts.dryRun === false,
+  });
+  const dryRun = publishMode.dryRun;
   const pipelineMode = resolvePipelineMode({
     reelmimicEnabled: config.reelmimic.enabled,
     openmontageEnabled: config.openmontage.enabled,
@@ -90,8 +101,8 @@ export async function runDailyWorkflow(opts: {
     preferOfflineFixture: true,
   });
 
-  const projectId = newId("proj");
-  const workflowId = newId("wf_daily");
+  const projectId = opts.projectId ?? newId("proj");
+  const workflowId = opts.workflowId ?? newId("wf_daily");
   const projectDir = join(opts.dataDir ?? config.dataDir, "projects", projectId);
   mkdirSync(projectDir, { recursive: true });
 
@@ -422,6 +433,17 @@ export async function runDailyWorkflow(opts: {
     persistWorkflow(projectDir, record);
 
     assertNotKilled(config);
+    if (!dryRun) {
+      const auth = youtubeStatus(config, opts.dataDir ?? config.dataDir);
+      if (auth.authClass !== "ready") {
+        throw new ToonForgeError({
+          code: "ADAPTER_UNAVAILABLE",
+          message: `YouTube authorization is ${auth.authClass}`,
+          component: "engines.workflow.daily",
+          retryable: false,
+        });
+      }
+    }
     const yt = createYoutubeAdapter(config.youtube, {
       dataDir: opts.dataDir ?? config.dataDir,
       dryRunDefault: dryRun,

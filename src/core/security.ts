@@ -20,7 +20,7 @@ export function assertSafeExternalUrl(raw: string): URL {
       component: "core.security",
     });
   }
-  if (BLOCKED_HOSTS.has(url.hostname)) {
+  if (BLOCKED_HOSTS.has(url.hostname) || isPrivateHost(url.hostname)) {
     throw new ToonForgeError({
       code: "POLICY_VIOLATION",
       message: "Blocked host",
@@ -29,6 +29,21 @@ export function assertSafeExternalUrl(raw: string): URL {
     });
   }
   return url;
+}
+
+function isPrivateHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host === "::1" || host === "0.0.0.0") return true;
+  const v4 = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (!v4) return host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:");
+  const octets = [Number(v4[1]), Number(v4[2]), Number(v4[3]), Number(v4[4])];
+  const a = octets[0] ?? 0;
+  const b = octets[1] ?? 0;
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
 }
 
 export function assertSafeRelativePath(path: string): void {

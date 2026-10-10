@@ -4,6 +4,8 @@ import { defaultCharacterRegistry } from "../characters/registry.js";
 import { getSystemStatus } from "../mcp/tools/system.js";
 import { createOrchestrator } from "../adapters/ruflo/index.js";
 import { runDoctor } from "./doctor.js";
+import { dispatchExtended, extendedHelp } from "./extended.js";
+import { resolvePublishMode } from "../core/publish-mode.js";
 
 async function main(): Promise<void> {
   const [cmd, sub, ...rest] = process.argv.slice(2);
@@ -80,18 +82,23 @@ async function main(): Promise<void> {
   if (cmd === "workflow" && sub === "run" && rest[0] === "daily") {
     const { runDailyWorkflow } = await import("../engines/workflow/daily.js");
     const publishFlag = rest.includes("--publish");
-    // Live upload only when --publish AND YOUTUBE_DRY_RUN=false (config.youtube.dryRunDefault).
-    const dryRun = publishFlag ? config.youtube.dryRunDefault : true;
-    if (publishFlag && dryRun) {
-      console.error(
-        "NOTE: --publish requested but YOUTUBE_DRY_RUN is not false; running dry-run publish only.",
-      );
+    const mode = resolvePublishMode({ config, requestedLive: publishFlag });
+    if (publishFlag && mode.dryRun) {
+      console.error(`NOTE: ${mode.reason}`);
     }
-    console.log(JSON.stringify(await runDailyWorkflow({ dryRun, publish: publishFlag }), null, 2));
+    console.log(JSON.stringify(await runDailyWorkflow({ dryRun: mode.dryRun, publish: publishFlag }), null, 2));
     return;
   }
 
   if (cmd === "mcp") {
+    if (sub === "--http" || rest.includes("--http")) {
+      const { startMcpHttp } = await import("../mcp/http.js");
+      const portFlag = rest[rest.indexOf("--port") + 1];
+      await startMcpHttp({
+        port: rest.includes("--port") ? Number(portFlag) : undefined,
+      });
+      return;
+    }
     const { startMcpStdio } = await import("../mcp/server.js");
     await startMcpStdio();
     return;
@@ -103,14 +110,18 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (await dispatchExtended(cmd, sub, rest, config)) return;
+
   if (cmd === "pause" || cmd === "resume") {
-    console.log(
-      JSON.stringify({
-        ok: true,
-        note: `${cmd} is foundation-level; set TOONFORGE_KILL_SWITCH=true/false for hard stop`,
-        killSwitch: config.killSwitch,
-      }),
-    );
+    const { pauseGlobal, resumeGlobal } = await import("../scheduler/index.js");
+    if (cmd === "pause") pauseGlobal(config.dataDir);
+    else resumeGlobal(config.dataDir);
+    console.log(JSON.stringify({
+      ok: true,
+      paused: cmd === "pause",
+      killSwitch: config.killSwitch,
+      note: "Scheduler pause is persistent. TOONFORGE_KILL_SWITCH remains the hard stop.",
+    }));
     return;
   }
 
@@ -135,9 +146,10 @@ Commands:
   workflow run daily [--publish]
   workflow status <id>
   mcp
+  mcp --http
   pause
   resume
-  help
+${extendedHelp()}  help
 `);
 }
 

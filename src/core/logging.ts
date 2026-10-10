@@ -44,22 +44,36 @@ export class Logger {
 
   private write(level: LogLevel, message: string, fields?: LogFields): void {
     if (LEVEL_ORDER[level] < LEVEL_ORDER[this.minLevel]) return;
+    const safeFields = sanitizeLogValue(fields ?? {}) as Record<string, unknown>;
     const line = {
       ts: new Date().toISOString(),
       level,
       component: this.component,
-      message,
-      ...fields,
+      message: sanitizeLogValue(message),
+      ...safeFields,
     };
-    const payload = JSON.stringify(line);
-    if (level === "error") {
-      console.error(payload);
-    } else if (level === "warn") {
-      console.warn(payload);
-    } else {
-      console.log(payload);
-    }
+    // stderr keeps stdout free for CLI JSON and MCP JSON-RPC.
+    console.error(JSON.stringify(line));
   }
+}
+
+function sanitizeLogValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => sanitizeLogValue(item));
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = /token|secret|password|api[_-]?key|authorization|credential/i.test(key)
+        ? "[REDACTED]"
+        : sanitizeLogValue(inner);
+    }
+    return out;
+  }
+  if (typeof value === "string") {
+    return value
+      .replace(/bearer\s+\S+/gi, "Bearer [REDACTED]")
+      .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, "[REDACTED]");
+  }
+  return value;
 }
 
 export const rootLogger = new Logger("toonforge");

@@ -41,3 +41,12 @@ jobs:
           "
       - name: Doctor
         run: npm run doctor
+      - name: Package smoke
+        run: |
+          npm pack --dry-run
+          npm pack
+          rm -rf /tmp/tf-install
+          mkdir -p /tmp/tf-install
+          npm install --prefix /tmp/tf-install "$PWD"/toonforge-*.tgz
+          node /tmp/tf-install/node_modules/toonforge/dist/cli/index.js --help
+          node /tmp/tf-install/node_modules/toonforge/dist/cli/index.js setup --check --non-interactive --home /tmp/tf-setup-home
