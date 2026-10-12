@@ -173,7 +173,12 @@ export async function dispatchExtended(
       backendReady: async (selected) => backendReady(config, selected.production_backend),
     });
     if (once) {
-      console.log(JSON.stringify(await tick(), null, 2));
+      const report = await tick();
+      console.log(JSON.stringify(report, null, 2));
+      if (report.failed.length > 0) {
+        console.error(`scheduler tick finished with ${report.failed.length} failed job(s)`);
+        process.exitCode = 1;
+      }
       return true;
     }
     const abort = new AbortController();

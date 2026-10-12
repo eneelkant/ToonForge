@@ -115,11 +115,29 @@ describe("scheduler", () => {
     expect(first.ran).toHaveLength(1);
     expect(second.ran).toHaveLength(0);
   });
+
+  it("reports a failed workflow execution instead of a success", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "tf-sched-fail-"));
+    const config = loadRuntimeConfig({ TOONFORGE_DATA_DIR: dataDir, TOONFORGE_KILL_SWITCH: "false" });
+    const result = await runSchedulerTick({
+      dataDir,
+      now: new Date("2026-10-10T07:00:00.000Z"),
+      channels: [channel()],
+      config,
+      execute: async () => ({ state: "FAILED", error: "provider exploded" }),
+    });
+    expect(result.ran).toHaveLength(0);
+    expect(result.failed).toHaveLength(1);
+  });
 });
 
 describe("youtube oauth loopback", () => {
   it("rejects a non-loopback redirect and a mismatched state", async () => {
     expect(() => assertLoopbackRedirect("https://example.com/callback")).toThrow(/loopback|http/);
+    expect(() => assertLoopbackRedirect("http://127.0.0.1/")).toThrow(/non-privileged/);
+    expect(() => assertLoopbackRedirect("http://127.0.0.1:80/")).toThrow(/non-privileged/);
+    expect(() => assertLoopbackRedirect("http://127.0.0.1:443/")).toThrow(/non-privileged/);
+    expect(assertLoopbackRedirect("http://127.0.0.1:53682/").href).toBe("http://127.0.0.1:53682/");
     const state = newOAuthState();
     const pending = waitForLoopbackCode({ hostname: "127.0.0.1", port: 0, expectedState: state, timeoutMs: 200, path: "/" });
     await expect(pending).rejects.toThrow(/Timed out/);

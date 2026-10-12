@@ -16,6 +16,7 @@ import {
 import { handleTool, listPrompts, listResources, readResource } from "./handlers.js";
 import { toolSchemaJson } from "./validate.js";
 import { ToonForgeError } from "../core/errors.js";
+import { publicErrorText, workflowProcessCode } from "../engines/workflow/result.js";
 
 export const MCP_TOOL_NAMES = [
   "toonforge.system_status",
@@ -57,6 +58,24 @@ export const MCP_TOOL_NAMES = [
   "toonforge.pause_channel",
   "toonforge.resume_channel",
 ] as const;
+
+export function toolCallResponse(name: string, result: unknown): {
+  isError?: true;
+  content: Array<{ type: "text"; text: string }>;
+} {
+  const record = result !== null && typeof result === "object" ? result as { state?: string; error?: unknown } : undefined;
+  const failed = name === "toonforge.run_daily_workflow" && workflowProcessCode(record ?? {}) === 1;
+  const body = failed && record
+    ? {
+        ...record,
+        error: typeof record.error === "string" ? publicErrorText(record.error) : record.error,
+      }
+    : result;
+  return {
+    ...(failed ? { isError: true as const } : {}),
+    content: [{ type: "text", text: JSON.stringify(body, null, 2) }],
+  };
+}
 
 export function createToonForgeMcpServer(): Server {
   const server = new Server(
@@ -119,9 +138,7 @@ export function createToonForgeMcpServer(): Server {
     try {
       // Safety: never expose env secrets through tool results.
       const result = await handleTool(name, args);
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
+      return toolCallResponse(name, result);
     } catch (error) {
       const typed = error instanceof ToonForgeError ? error.toJSON() : undefined;
       const payload = {

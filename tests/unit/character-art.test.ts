@@ -111,7 +111,38 @@ describe("character art identity", () => {
         durationSec: 2,
         fps: 1,
       }),
-    ).toThrow(/bolt/);
+    ).toThrow(/bolt[\s\S]*no finished SVG rig/);
+  });
+
+  it("checks Bolt and fox Milo against their own designs", async () => {
+    const characters = await defaultCharacterRegistry().list();
+    const bolt = characters.find((character) => character.character_id === "bolt");
+    const milo = characters.find((character) => character.character_id === "milo");
+    if (!bolt || !milo) throw new Error("registry missing bolt or milo");
+
+    expect(() => identityFromCharacter(bolt)).toThrow(/yellow chassis, visor eye, gripper hands/);
+    expect(() => identityFromCharacter(bolt)).toThrow(/no finished SVG rig/);
+    expect(() => identityFromCharacter(bolt)).not.toThrow(/auburn/);
+    expect(() => identityFromCharacter(milo)).toThrow(/cartoon fox, cream fur, rust fur, green scarf/);
+    expect(() => identityFromCharacter(milo)).not.toThrow(/auburn|blue hoodie/);
+
+    expect(() => identityFromCharacter({
+      ...bolt,
+      canonical_description: "A kid with auburn hair, goggles, a blue hoodie, and cargo shorts.",
+      wardrobe: ["blue hoodie", "cargo shorts"],
+    })).toThrow(/yellow chassis/);
+
+    expect(() => identityFromCharacter({
+      ...milo,
+      canonical_description: "A monkey with a sketchbook.",
+      wardrobe: ["sketchbook"],
+    })).toThrow(/cartoon fox/);
+
+    expect(() => identityFromCharacter({
+      ...bolt,
+      character_id: "guest",
+      display_name: "Guest",
+    })).toThrow(/no locked design/);
   });
 
   it("moves the hands through reach, fit, and wave instead of holding a static prop", () => {

@@ -40,6 +40,7 @@ import {
   toStoryFormatHints,
   type PipelineMode,
 } from "../reference/index.js";
+import { publicErrorText } from "./result.js";
 
 const log = rootLogger.child("engines.workflow.daily");
 
@@ -589,7 +590,7 @@ export async function runDailyWorkflow(opts: {
       provenancePath,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = publicErrorText(error instanceof Error ? error.message : String(error));
     log.error("daily.failed", {
       workflowId,
       projectId,

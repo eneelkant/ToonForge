@@ -33,7 +33,8 @@ export function assertLoopbackRedirect(raw: string): URL {
       component: "adapters.youtube.connect",
     });
   }
-  if (!url.port || url.port === "80") {
+  const port = Number(url.port);
+  if (!url.port || !Number.isInteger(port) || port < 1024 || port > 65535) {
     throw new ToonForgeError({
       code: "CONFIG_INVALID",
       message: "Set YOUTUBE_REDIRECT_URI to a loopback URL with a non-privileged port, for example http://127.0.0.1:53682/",

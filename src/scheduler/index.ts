@@ -105,11 +105,12 @@ function enqueue(dataDir: string, jobs: ScheduledJob[], channel: ChannelConfig, 
   appendAudit(dataDir, { jobId: id, decision: "enqueue", dueAt: due.toISOString() });
 }
 
-export async function runSchedulerTick(input: TickInput): Promise<{ ran: string[]; skipped: string[] }> {
+export async function runSchedulerTick(input: TickInput): Promise<{ ran: string[]; skipped: string[]; failed: string[] }> {
   const owner = input.owner ?? `tick-${process.pid}`;
   acquireSchedulerLock(input.dataDir, owner, 60_000, input.now);
   const ran: string[] = [];
   const skipped: string[] = [];
+  const failed: string[] = [];
   try {
     const control = loadControl(input.dataDir);
     const state = loadState(input.dataDir);
@@ -144,6 +145,7 @@ export async function runSchedulerTick(input: TickInput): Promise<{ ran: string[
       try {
         const result = await input.execute(job, channel, { dryRun });
         if (result.state === "FAILED" || result.error) {
+          failed.push(job.id);
           job.status = job.attempts >= input.config.maxRetries ? "failed" : "queued";
           job.lastError = result.error ?? result.state;
           if (job.status === "queued") {
@@ -159,6 +161,7 @@ export async function runSchedulerTick(input: TickInput): Promise<{ ran: string[
           appendAudit(input.dataDir, { jobId: job.id, decision: "succeeded", dryRun });
         }
       } catch (error) {
+        failed.push(job.id);
         const retryable = error instanceof ToonForgeError ? error.retryable : false;
         job.lastError = error instanceof Error ? error.message : String(error);
         job.status = retryable && job.attempts < input.config.maxRetries ? "queued" : "failed";
@@ -171,7 +174,7 @@ export async function runSchedulerTick(input: TickInput): Promise<{ ran: string[
       saveState(input.dataDir, state);
     }
     saveState(input.dataDir, state);
-    return { ran, skipped };
+    return { ran, skipped, failed };
   } finally {
     releaseSchedulerLock(input.dataDir, owner);
   }
