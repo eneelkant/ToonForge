@@ -216,7 +216,13 @@ export async function handleTool(name: string, rawArgs: Record<string, unknown>)
     case "toonforge.schedule_publish":
     case "toonforge.publish_video": {
       const mode = resolvePublishMode({ config, requestedLive: args.dryRun === false });
-      const yt = createYoutubeAdapter(config.youtube, { dryRunDefault: true });
+      const channelPath = args.channelPath ? String(args.channelPath) : defaultChannelPath();
+      const yt = createYoutubeAdapter(config.youtube, {
+        dataDir: config.dataDir,
+        dryRunDefault: mode.dryRun,
+        channelPath,
+        envTargetChannelId: config.youtube.targetChannelId,
+      });
       const result = await yt.publish({
         idempotencyKey: String(args.idempotencyKey ?? `pub:${args.projectId}:${args.videoId}`),
         projectId: String(args.projectId),

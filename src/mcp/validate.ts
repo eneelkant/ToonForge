@@ -102,6 +102,8 @@ function publishArgs() {
       dryRun: z.boolean().optional(),
       workflowState: z.string().optional(),
       qaStatus: z.enum(["PASS", "FAIL", "WARN"]),
+      /** Channel file whose youtube_channel_id is the publish target. Not authenticated identity. */
+      channelPath: z.string().min(1).optional(),
       metadata: publishMetadata,
     })
     .strict();

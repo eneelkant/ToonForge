@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultCharacterRegistry } from "../../src/characters/registry.js";
 import { generateDevVideo } from "../../src/core/media.js";
 import type { OpenMontageAdapter } from "../../src/adapters/openmontage/types.js";
@@ -38,7 +38,24 @@ function readyAdapter(): OpenMontageAdapter {
 }
 
 describe("daily workflow OpenMontage selection", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it("records the OpenMontage backend and keeps reference analysis footage-free", async () => {
+    for (const key of [
+      "TOONFORGE_TTS_PROVIDER",
+      "TOONFORGE_PIPER_PYTHON",
+      "TOONFORGE_PIPER_MODEL",
+      "TOONFORGE_MUSIC_FILE",
+      "TOONFORGE_TTS_LICENSE",
+      "TOONFORGE_MUSIC_LICENSE",
+      "TOONFORGE_TTS_ATTRIBUTION",
+      "TOONFORGE_MUSIC_ATTRIBUTION",
+      "TOONFORGE_TTS_SOURCE_URL",
+      "TOONFORGE_MUSIC_SOURCE_URL",
+      "TOONFORGE_MUSIC_TITLE",
+    ]) {
+      vi.stubEnv(key, "");
+    }
     const dataDir = mkdtempSync(join(tmpdir(), "tf-om-daily-"));
     const characters = await defaultCharacterRegistry().list();
     const result = await runDailyWorkflow({

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { google } from "googleapis";
+import { missingYoutubeOAuthVars, youtubeOAuthMissingMessage } from "../../core/env.js";
 import { ToonForgeError } from "../../core/errors.js";
 import { rootLogger } from "../../core/logging.js";
 import type { RuntimeConfig } from "../../core/config.js";
@@ -29,10 +30,11 @@ export function saveTokenFile(path: string, token: TokenJson): void {
 }
 
 export function createOAuth2Client(config: RuntimeConfig["youtube"]) {
-  if (!config.clientId || !config.clientSecret) {
+  const missing = missingYoutubeOAuthVars(config);
+  if (missing.length > 0) {
     throw new ToonForgeError({
       code: "CONFIG_INVALID",
-      message: "YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET are required",
+      message: youtubeOAuthMissingMessage(missing),
       component: "adapters.youtube.oauth",
     });
   }

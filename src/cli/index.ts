@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { loadProjectEnv } from "../core/env.js";
 import { loadChannelConfig, loadRuntimeConfig } from "../core/config.js";
 import { defaultCharacterRegistry } from "../characters/registry.js";
 import { getSystemStatus } from "../mcp/tools/system.js";
@@ -6,6 +7,8 @@ import { createOrchestrator } from "../adapters/ruflo/index.js";
 import { runDoctor } from "./doctor.js";
 import { dispatchExtended, extendedHelp } from "./extended.js";
 import { resolvePublishMode } from "../core/publish-mode.js";
+
+loadProjectEnv();
 
 async function main(): Promise<void> {
   const [cmd, sub, ...rest] = process.argv.slice(2);
@@ -94,12 +97,22 @@ async function main(): Promise<void> {
     if (dailyArgs.publish && mode.dryRun) {
       console.error(`NOTE: ${mode.reason}`);
     }
-    console.log(JSON.stringify(await runDailyWorkflow({
+    const { publicErrorText, workflowProcessCode } = await import("../engines/workflow/result.js");
+    const result = await runDailyWorkflow({
       dryRun: mode.dryRun,
       publish: dailyArgs.publish,
       pipelineMode: dailyArgs.pipelineMode,
       channelPath: dailyArgs.channelPath,
-    }), null, 2));
+    });
+    const safe = {
+      ...result,
+      error: typeof result.error === "string" ? publicErrorText(result.error) : result.error,
+    };
+    console.log(JSON.stringify(safe, null, 2));
+    if (workflowProcessCode(safe) !== 0) {
+      console.error(`workflow failed: ${safe.error ?? safe.state}`);
+      process.exitCode = 1;
+    }
     return;
   }
 

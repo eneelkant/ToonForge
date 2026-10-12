@@ -40,6 +40,7 @@ import {
   toStoryFormatHints,
   type PipelineMode,
 } from "../reference/index.js";
+import { publicErrorText } from "./result.js";
 
 const log = rootLogger.child("engines.workflow.daily");
 
@@ -517,6 +518,8 @@ export async function runDailyWorkflow(opts: {
     const yt = createYoutubeAdapter(config.youtube, {
       dataDir: opts.dataDir ?? config.dataDir,
       dryRunDefault: dryRun,
+      channelPath: opts.channelPath ?? defaultChannelPath(),
+      envTargetChannelId: config.youtube.targetChannelId,
     });
     const publish = await yt.publish({
       idempotencyKey: `pub:${projectId}:video`,
@@ -589,7 +592,7 @@ export async function runDailyWorkflow(opts: {
       provenancePath,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = publicErrorText(error instanceof Error ? error.message : String(error));
     log.error("daily.failed", {
       workflowId,
       projectId,

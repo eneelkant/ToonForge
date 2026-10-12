@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { defaultCharacterRegistry } from "../../src/characters/registry.js";
 import type { CharacterRecord } from "../../src/characters/types.js";
 import { loadRuntimeConfig, assertNotKilled } from "../../src/core/config.js";
@@ -507,12 +507,17 @@ describe("OpenMontage production routing", () => {
 
 describe("OpenMontage MCP", () => {
   it("exposes health and backend tools and keeps the offline default", async () => {
-    expect(MCP_TOOL_NAMES).toContain("toonforge.openmontage_health");
-    expect(MCP_TOOL_NAMES).toContain("toonforge.production_backends");
-    const health = await handleTool("toonforge.openmontage_health", {});
-    expect(health).toMatchObject({ status: "disabled" });
-    const backends = (await handleTool("toonforge.production_backends", {})) as { selected: string };
-    expect(backends.selected).toBe("offline_fixture");
+    vi.stubEnv("OPENMONTAGE_ENABLED", "false");
+    try {
+      expect(MCP_TOOL_NAMES).toContain("toonforge.openmontage_health");
+      expect(MCP_TOOL_NAMES).toContain("toonforge.production_backends");
+      const health = await handleTool("toonforge.openmontage_health", {});
+      expect(health).toMatchObject({ status: "disabled" });
+      const backends = (await handleTool("toonforge.production_backends", {})) as { selected: string };
+      expect(backends.selected).toBe("offline_fixture");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 

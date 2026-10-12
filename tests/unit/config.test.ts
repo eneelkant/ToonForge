@@ -26,6 +26,7 @@ describe("config + idempotency", () => {
     expect(cfg.youtubeTrends.regionCode).toBe("GB");
     expect(cfg.youtubeTrends.maxResults).toBe(10);
     expect(cfg.youtube.dryRunDefault).toBe(true);
+    expect(cfg.youtube.redirectUri).toBe("http://127.0.0.1:53682/");
   });
 
   it("builds stable publish idempotency keys", () => {

@@ -4,6 +4,9 @@ import { execFile } from "node:child_process";
 import { ToonForgeError } from "../../core/errors.js";
 import type { TokenJson } from "./oauth.js";
 
+/** Loopback callback the local OAuth server binds. Google's registered redirect must match it exactly. */
+export const CANONICAL_YOUTUBE_REDIRECT_URI = "http://127.0.0.1:53682/";
+
 export function newOAuthState(): string {
   return randomBytes(24).toString("hex");
 }
@@ -33,7 +36,8 @@ export function assertLoopbackRedirect(raw: string): URL {
       component: "adapters.youtube.connect",
     });
   }
-  if (!url.port || url.port === "80") {
+  const port = Number(url.port);
+  if (!url.port || !Number.isInteger(port) || port < 1024 || port > 65535) {
     throw new ToonForgeError({
       code: "CONFIG_INVALID",
       message: "Set YOUTUBE_REDIRECT_URI to a loopback URL with a non-privileged port, for example http://127.0.0.1:53682/",

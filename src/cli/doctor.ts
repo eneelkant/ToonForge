@@ -2,10 +2,13 @@ import { access, constants } from "node:fs/promises";
 import { resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { loadProjectEnv } from "../core/env.js";
 import { loadRuntimeConfig } from "../core/config.js";
 import { evaluateDependencies } from "../setup/dependencies.js";
 import { getSystemStatus } from "../mcp/tools/system.js";
 import { productionAudioConfigured } from "../engines/audio/production.js";
+
+loadProjectEnv();
 
 const execFileAsync = promisify(execFile);
 

@@ -23,8 +23,11 @@ From `.env.example`:
 - `YOUTUBE_CLIENT_ID`
 - `YOUTUBE_CLIENT_SECRET`
 - `YOUTUBE_REDIRECT_URI`
+- `YOUTUBE_CHANNEL_ID`
 - `YOUTUBE_TOKEN_PATH`
 - `DEFAULT_PRIVACY_STATUS`
+
+`toonforge` and the MCP server read the repository-root `.env` when those variables are unset. A value already present in the process environment is left unchanged. CI and deployed processes can inject the variables and omit the file. Missing OAuth names are printed without values. `YOUTUBE_CHANNEL_ID` selects the publish target; it does not prove the Google account controls that channel.
 
 Use Google Cloud OAuth **Desktop** client with YouTube Data API v3 enabled.
 
@@ -50,9 +53,17 @@ Publishing requires:
 - `originalContent: true` and no `thirdPartyFootage`
 - video (and thumbnail if set) exist on disk
 
+## Channel binding
+
+The publish target is `youtube_channel_id` on the channel file, or `YOUTUBE_CHANNEL_ID` when the file omits it. If both are set they must be the same id. Neither value proves the OAuth account controls that channel.
+
+The authenticated channel is the selected record in `data/youtube/accounts.json`, written by `youtube connect` from `channels.list`. A selected id with no stored record does not count. A caller-supplied channel id is ignored.
+
+`publish preflight` reports `channelBinding` as `match` or `target_channel_missing`, `target_channel_invalid`, `target_channel_ambiguous`, `authenticated_channel_missing`, or `channel_mismatch`. The CLI exits 1 unless the binding is `match`. Live upload repeats the check immediately before `videos.insert`. A missing, invalid, or ambiguous target throws `CONFIG_INVALID`. A missing or different authenticated channel throws `POLICY_VIOLATION` and does not call the upload API. CLI, MCP, and the scheduler surface that failure instead of a success.
+
 ## OAuth
 
-Desktop OAuth client. Redirect URI must be `http://127.0.0.1` or `http://localhost` with a port other than 80.
+Desktop OAuth client. The default redirect is `http://127.0.0.1:53682/`. The local callback binds that host, port, and path. Google Cloud's registered redirect URI must match the configured value exactly, including the trailing slash. `http://127.0.0.1/` and other privileged ports are rejected. Another non-privileged loopback URI is accepted only when it is the registered URI.
 
 ```bash
 node dist/cli/index.js youtube connect

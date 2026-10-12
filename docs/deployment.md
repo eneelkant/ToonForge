@@ -76,7 +76,7 @@ npm run cli -- omnichar health
 
 1. Create a Google Cloud OAuth desktop client and enable YouTube Data API v3.
 2. Set the redirect to a loopback URL with a port, for example `http://127.0.0.1:53682/`.
-3. Set `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REDIRECT_URI`.
+3. Set `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REDIRECT_URI` in the environment or the ignored repository `.env`. The process environment wins when both are present.
 4. Run `node dist/cli/index.js youtube connect`. The CLI opens Google's authorization page and stores the refresh token under `YOUTUBE_TOKEN_PATH` and `data/youtube/tokens/<channelId>.json` (mode 0600). It never asks for a Google password.
 5. Confirm with `youtube status` (`authClass: ready`) and `youtube channels`.
 

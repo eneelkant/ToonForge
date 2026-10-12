@@ -5,7 +5,8 @@ import { defaultChannelPath } from "../core/paths.js";
 import { liveOptInPath } from "../core/publish-mode.js";
 import { loadChannelConfig } from "../core/config.js";
 import { getAuthUrl } from "../adapters/youtube/oauth.js";
-import { connectYoutube, openSystemBrowser } from "../adapters/youtube/connect.js";
+import { assertLoopbackRedirect, connectYoutube, openSystemBrowser } from "../adapters/youtube/connect.js";
+import { missingYoutubeOAuthVars, youtubeOAuthMissingMessage } from "../core/env.js";
 import { disconnectChannel, loadAccounts, rememberChannel, youtubeStatus, YOUTUBE_OAUTH_SCOPES } from "../adapters/youtube/account.js";
 import { publishPreflight } from "../engines/publish/preflight.js";
 import { pauseChannel, pauseGlobal, previewChannel, resumeChannel, resumeGlobal, runSchedulerTick, schedulerStatus } from "../scheduler/index.js";
@@ -81,8 +82,16 @@ export async function dispatchExtended(
     return true;
   }
   if (cmd === "youtube" && sub === "connect") {
-    if (!config.youtube.clientId || !config.youtube.clientSecret) {
-      console.error("Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET before connecting. Google passwords are never collected.");
+    const missing = missingYoutubeOAuthVars(config.youtube);
+    if (missing.length > 0) {
+      console.error(youtubeOAuthMissingMessage(missing));
+      process.exitCode = 2;
+      return true;
+    }
+    try {
+      assertLoopbackRedirect(config.youtube.redirectUri);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 2;
       return true;
     }
@@ -173,7 +182,12 @@ export async function dispatchExtended(
       backendReady: async (selected) => backendReady(config, selected.production_backend),
     });
     if (once) {
-      console.log(JSON.stringify(await tick(), null, 2));
+      const report = await tick();
+      console.log(JSON.stringify(report, null, 2));
+      if (report.failed.length > 0) {
+        console.error(`scheduler tick finished with ${report.failed.length} failed job(s)`);
+        process.exitCode = 1;
+      }
       return true;
     }
     const abort = new AbortController();
@@ -188,7 +202,12 @@ export async function dispatchExtended(
 
   if (cmd === "publish" && sub === "preflight") {
     const channel = loadChannelConfig(option(tokens, "--channel-config") ?? defaultChannelPath());
-    console.log(JSON.stringify(publishPreflight(config, channel), null, 2));
+    const report = publishPreflight(config, channel);
+    console.log(JSON.stringify(report, null, 2));
+    if (report.channelBinding !== "match") {
+      console.error(`publish preflight failed: ${report.channelBinding}`);
+      process.exitCode = 1;
+    }
     return true;
   }
   if (cmd === "publish" && sub === "enable-live") {
