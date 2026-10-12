@@ -14,6 +14,7 @@ import { createStoryboard } from "../storyboard/index.js";
 import { buildContinuityPlan, persistContinuityPlan, validateContinuityPlan } from "../continuity/index.js";
 import { createOmniCharAdapter } from "../../adapters/omnichar/index.js";
 import { produceCartoon } from "../production/index.js";
+import { narrationMouthEnvelope, renderCharacterArt } from "../character-art/index.js";
 import { generateAudioBundle } from "../audio/index.js";
 import { buildContentPackage } from "../packaging/index.js";
 import { runQa } from "../qa/index.js";
@@ -376,6 +377,40 @@ export async function runDailyWorkflow(opts: {
       provenance.policyNotes.push(audio.credits ?? "Production audio licenses recorded.");
     }
     provenance.timestamps.push(stamp("audio.complete"));
+
+    if (production.provider === "toonforge-character-art") {
+      const fps = 12;
+      const durationSec =
+        videoProbe.durationSec && videoProbe.durationSec > 0 ? videoProbe.durationSec : channel.duration_seconds;
+      const frameCount = Math.max(1, Math.round(durationSec * fps));
+      const mouthOpen = await narrationMouthEnvelope(audio.voicePath, frameCount, fps);
+      await renderCharacterArt({
+        characters,
+        storyboard,
+        outPath: production.videoPath,
+        framesDir: join(projectDir, "character-art"),
+        durationSec,
+        fps,
+        mouthOpen,
+        python: config.openmontage.python || "python3",
+      });
+      const synced = await validateVideo(production.videoPath, { requireAudio: false, kindHint: production.kind });
+      if (!synced.ok) {
+        throw new ToonForgeError({
+          code: "VALIDATION_FAILED",
+          message: `Narration-synced character art failed validation: ${synced.errors.join("; ")}`,
+          component: "engines.workflow.daily",
+        });
+      }
+      provenance.policyNotes.push(
+        "Mouth motion follows a 40 ms RMS envelope of the fitted narration. Piper's CLI does not emit phoneme timestamps, so this is not phoneme lip-sync.",
+      );
+      if (audio.mixChannels === 2) {
+        provenance.policyNotes.push(
+          "The mix is stereo because the licensed music file has two channels. Narration is centered in that stereo image.",
+        );
+      }
+    }
 
     record = advance(record, "ASSEMBLY");
     persistWorkflow(projectDir, record);

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,6 +7,9 @@ import { ToonForgeError } from "../../core/errors.js";
 import type { CharacterRecord } from "../../characters/types.js";
 import type { Storyboard } from "../storyboard/index.js";
 import { buildCharacterFrames } from "./frames.js";
+import { frameEnvelope } from "./mouth.js";
+
+const execFileAsync = promisify(execFile);
 
 export interface CharacterArtRunResult {
   code: number | null;
@@ -29,6 +33,8 @@ export interface RenderCharacterArtInput {
   framesDir: string;
   durationSec: number;
   fps?: number;
+  /** Fitted narration waveform openness, one value per frame. Not phoneme timestamps. */
+  mouthOpen?: number[];
   python: string;
   scriptPath?: string;
   run?: CharacterArtRunner;
@@ -101,6 +107,40 @@ function parseResponse(stdout: string): { ok?: boolean; error_class?: string; me
   }
 }
 
+/**
+ * Openness per frame from the fitted narration waveform.
+ * Piper does not emit phoneme timestamps; this is an amplitude envelope.
+ */
+export async function narrationMouthEnvelope(voicePath: string, frameCount: number, fps: number): Promise<number[]> {
+  const sampleRate = 16_000;
+  let pcm: Buffer;
+  try {
+    const result = await execFileAsync(
+      "ffmpeg",
+      ["-v", "error", "-i", voicePath, "-ac", "1", "-ar", String(sampleRate), "-f", "f32le", "-"],
+      { encoding: "buffer", maxBuffer: 32 * 1024 * 1024, timeout: 60_000 },
+    );
+    pcm = result.stdout;
+  } catch (error) {
+    throw new ToonForgeError({
+      code: "UPSTREAM_ERROR",
+      message: `Could not read the fitted narration for mouth timing: ${error instanceof Error ? error.message : String(error)}`,
+      component: "engines.character-art",
+      cause: error,
+    });
+  }
+  if (pcm.length < 4 || pcm.length % 4 !== 0) {
+    throw new ToonForgeError({
+      code: "VALIDATION_FAILED",
+      message: "Fitted narration did not decode to PCM for mouth timing.",
+      component: "engines.character-art",
+    });
+  }
+  const aligned = Buffer.from(pcm);
+  const samples = new Float32Array(aligned.buffer, aligned.byteOffset, aligned.length / 4);
+  return frameEnvelope(samples, sampleRate, frameCount, fps);
+}
+
 export async function renderCharacterArt(input: RenderCharacterArtInput): Promise<RenderCharacterArtResult> {
   const fps = input.fps ?? 12;
   const frames = buildCharacterFrames({
@@ -108,6 +148,7 @@ export async function renderCharacterArt(input: RenderCharacterArtInput): Promis
     storyboard: input.storyboard,
     durationSec: input.durationSec,
     fps,
+    mouthOpen: input.mouthOpen,
   });
   mkdirSync(input.framesDir, { recursive: true });
   for (const frame of frames) {

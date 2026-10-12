@@ -6,7 +6,7 @@ export interface ArtInspection {
   findings: string[];
 }
 
-const REQUIRED_IDS = ["hair", "goggles", "hoodie", "shorts", "mouth", "arm-left", "arm-right", "eye-left", "eye-right"];
+const REQUIRED_IDS = ["hair", "goggles", "hoodie", "shorts", "mouth", "arm-left", "arm-right", "hand-left", "hand-right", "eye-left", "eye-right"];
 
 /** Markers that identify the OpenMontage schematic rig. Original art must not carry them. */
 const SCHEMATIC_MARKERS = ['cy="230" r="90"', "#9bd7ff", "#75c878", "gsap", "cdn.jsdelivr.net"];

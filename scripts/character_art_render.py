@@ -4,6 +4,10 @@
 This script is Apache-2.0 ToonForge code. It does not import OpenMontage and
 does not draw the schematic rig. Playwright and ffmpeg are optional runtime
 tools: if either is missing, the process fails with missing_dependencies.
+
+The caller starts this file with OPENMONTAGE_PYTHON and passes absolute frame
+and output paths in the JSON request. The script does not hard-code a Linux
+home directory. macOS execution has not been verified.
 """
 
 from __future__ import annotations

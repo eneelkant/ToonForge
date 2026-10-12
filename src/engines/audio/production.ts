@@ -132,6 +132,8 @@ export async function generateProductionAudio(input: ProductionAudioRequest): Pr
   credits: string;
   licenses: LicensedAsset[];
   levels: { voiceMeanDb: number; musicMeanDb: number; mixMaxDb: number };
+  /** Channel count of the mix. Stereo is used only when the music file itself is stereo. */
+  mixChannels: number;
 }> {
   const config = input.config ?? resolveProductionAudioConfig(input.env);
   const narration = input.story.narration?.trim() ?? "";
@@ -193,13 +195,20 @@ export async function generateProductionAudio(input: ProductionAudioRequest): Pr
     "aac",
     musicPath,
   ]);
+  const musicChannels = await probeChannels(musicPath);
+  const stereo = musicChannels >= 2;
+  // A mono voice is centered into a stereo music bed. A mono music file stays mono.
+  // Duplicating a mono mix into two identical channels is not treated as stereo.
+  const mixFilter = stereo
+    ? "[0:a]aformat=channel_layouts=mono,pan=stereo|c0=c0|c1=c0,volume=1[v];[1:a]aformat=channel_layouts=stereo,volume=0.9[m];[v][m]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]"
+    : "[0:a]aformat=channel_layouts=mono,volume=1[v];[1:a]aformat=channel_layouts=mono,volume=0.9[m];[v][m]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]";
   await runFfmpeg([
     "-i",
     voicePath,
     "-i",
     musicPath,
     "-filter_complex",
-    "[0:a]volume=1[v];[1:a]volume=0.9[m];[v][m]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]",
+    mixFilter,
     "-map",
     "[a]",
     "-ar",
@@ -208,6 +217,12 @@ export async function generateProductionAudio(input: ProductionAudioRequest): Pr
     "aac",
     mixPath,
   ]);
+  const mixChannels = await probeChannels(mixPath);
+  if (mixChannels !== (stereo ? 2 : 1)) {
+    throw audioError(
+      `Mix channel count ${mixChannels} does not match the music file (${musicChannels} channel${musicChannels === 1 ? "" : "s"}).`,
+    );
+  }
 
   const voiceLevel = await measureVolume(voicePath);
   const musicLevel = await measureVolume(musicPath);
@@ -250,6 +265,8 @@ export async function generateProductionAudio(input: ProductionAudioRequest): Pr
     "kind=provider",
     `narration_sha256=${narrationSha256}`,
     "script is the ToonForge story narration, not a reference transcript",
+    `mix_channels=${mixChannels}`,
+    stereo ? "stereo mix from the licensed music file; narration is centered" : "mono mix because the licensed music file is mono",
     ...licenses.map((item) => `${item.asset}=${item.license}`),
   ];
   for (const file of [voicePath, musicPath, mixPath]) {
@@ -266,6 +283,7 @@ export async function generateProductionAudio(input: ProductionAudioRequest): Pr
         targetDurationSec: target,
         spokenDurationSec: spoken,
         tempo,
+        mixChannels,
         levels: { voiceMeanDb: voiceLevel.meanDb, musicMeanDb: musicLevel.meanDb, mixMaxDb: mixLevel.maxDb },
         licenses,
         createdAt: new Date().toISOString(),
@@ -285,6 +303,7 @@ export async function generateProductionAudio(input: ProductionAudioRequest): Pr
     credits,
     licenses,
     levels: { voiceMeanDb: voiceLevel.meanDb, musicMeanDb: musicLevel.meanDb, mixMaxDb: mixLevel.maxDb },
+    mixChannels,
   };
 }
 
@@ -317,6 +336,25 @@ async function probeDuration(path: string): Promise<number> {
     path,
   ], { encoding: "utf8" });
   return Number(stdout.trim());
+}
+
+async function probeChannels(path: string): Promise<number> {
+  const { stdout } = await execFileAsync("ffprobe", [
+    "-v",
+    "error",
+    "-select_streams",
+    "a:0",
+    "-show_entries",
+    "stream=channels",
+    "-of",
+    "default=nw=1:nk=1",
+    path,
+  ], { encoding: "utf8" });
+  const channels = Number(stdout.trim());
+  if (!Number.isFinite(channels) || channels < 1) {
+    throw audioError(`Could not read the channel count for ${path}`);
+  }
+  return channels;
 }
 
 async function probeSampleRate(path: string): Promise<number> {

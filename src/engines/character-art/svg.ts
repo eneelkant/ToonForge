@@ -1,6 +1,6 @@
 import type { CharacterArtIdentity } from "./identity.js";
 import { MAX_PALETTE } from "./identity.js";
-import type { PoseState } from "./poses.js";
+import type { Point, PoseState } from "./poses.js";
 
 function xml(value: string): string {
   return value
@@ -21,78 +21,123 @@ function eye(id: string, cx: number, pose: PoseState): string {
 }
 
 function mouth(pose: PoseState): string {
-  if (pose.mouth === "open") {
-    return `<g id="mouth">
-      <ellipse cx="0" cy="-292" rx="14" ry="16" fill="#6e2430" stroke="${MAX_PALETTE.ink}" stroke-width="4"/>
-      <path d="M-10 -286 Q0 -278 10 -286" fill="none" stroke="#f0b3b8" stroke-width="3" stroke-linecap="round"/>
+  const open = pose.mouthOpen;
+  if (open < 0.18) {
+    return `<path id="mouth" data-mouth-open="${open}" d="M-20 -302 Q0 ${-286 + open * 20} 20 -302" fill="none" stroke="#6e2430" stroke-width="5" stroke-linecap="round"/>`;
+  }
+  const ry = 4 + open * 14;
+  const rx = 12 + open * 4;
+  return `<g id="mouth" data-mouth-open="${open}">
+      <ellipse cx="0" cy="${-296 + ry * 0.2}" rx="${rx}" ry="${ry}" fill="#6e2430" stroke="${MAX_PALETTE.ink}" stroke-width="4"/>
+      <path d="M${-rx * 0.55} ${-298 + ry * 0.15} Q0 ${-292 + ry * 0.35} ${rx * 0.55} ${-298 + ry * 0.15}" fill="none" stroke="#f0b3b8" stroke-width="3" stroke-linecap="round"/>
     </g>`;
-  }
-  if (pose.mouth === "soft") {
-    return `<path id="mouth" d="M-14 -298 Q0 -288 16 -300" fill="none" stroke="#6e2430" stroke-width="5" stroke-linecap="round"/>`;
-  }
-  return `<path id="mouth" d="M-20 -302 Q0 -278 20 -302" fill="none" stroke="#6e2430" stroke-width="5" stroke-linecap="round"/>`;
 }
 
-function storyProp(pose: PoseState, ink: string): string {
-  if (pose.name === "look" || pose.name === "blink") {
-    return `<g id="story-prop" transform="translate(880 452)">
-      <circle r="46" fill="#ffe7a0" opacity="0.55"/>
-      <circle r="28" fill="#e2b84a" stroke="${ink}" stroke-width="4"/>
-      <circle r="9" fill="#fff6dc" stroke="${ink}" stroke-width="3"/>
-      <path d="M0 -40 V-28 M0 28 V40 M-40 0 H-28 M28 0 H40 M-28 -28 L-20 -20 M20 20 L28 28 M-28 28 L-20 20 M20 -20 L28 -28" fill="none" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>
-    </g>`;
-  }
-  if (pose.name === "gesture") {
-    return `<g id="story-prop" transform="translate(870 468)">
-      <rect x="-46" y="-28" width="92" height="40" rx="10" fill="#6f8f86" stroke="${ink}" stroke-width="4"/>
-      <rect x="-16" y="-48" width="32" height="24" rx="6" fill="#d7d2cb" stroke="${ink}" stroke-width="4"/>
-      <circle cx="28" cy="-8" r="7" fill="#7ec8e3" stroke="${ink}" stroke-width="3"/>
-      <path d="M-8 -48 C-18 -78 8 -84 0 -108" fill="none" stroke="#3f8f55" stroke-width="4" stroke-linecap="round"/>
-      <ellipse cx="0" cy="-116" rx="14" ry="10" fill="#7fbf6a" stroke="${ink}" stroke-width="3"/>
-    </g>`;
-  }
-  if (pose.name === "wonder") {
-    const lift = Math.round(pose.bob);
-    return `<g id="story-prop" transform="translate(860 ${360 - lift})">
-      <path d="M0 36 C8 18 8 8 0 -8" fill="none" stroke="#3f8f55" stroke-width="4" stroke-linecap="round"/>
-      <ellipse cx="0" cy="-20" rx="16" ry="22" fill="#f4e27a" stroke="${ink}" stroke-width="4"/>
-      <ellipse cx="-18" cy="-4" rx="14" ry="8" fill="#f7f3ea" stroke="${ink}" stroke-width="3"/>
-      <ellipse cx="18" cy="-4" rx="14" ry="8" fill="#f7f3ea" stroke="${ink}" stroke-width="3"/>
-      <ellipse cx="0" cy="2" rx="12" ry="7" fill="#f7f3ea" stroke="${ink}" stroke-width="3"/>
-      <circle cx="0" cy="-20" r="5" fill="#fff6dc"/>
-    </g>`;
-  }
-  return "";
+function capsule(from: Point, to: Point, radius: number, fill: string, ink: string): string {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = (-dy / len) * radius;
+  const ny = (dx / len) * radius;
+  return `<path d="M ${from.x + nx} ${from.y + ny} L ${to.x + nx} ${to.y + ny} A ${radius} ${radius} 0 0 1 ${to.x - nx} ${to.y - ny} L ${from.x - nx} ${from.y - ny} A ${radius} ${radius} 0 0 1 ${from.x + nx} ${from.y + ny} Z" fill="${fill}" stroke="${ink}" stroke-width="4" stroke-linejoin="round"/>`;
 }
 
-function arm(id: string, side: "left" | "right", deg: number, identity: CharacterArtIdentity): string {
-  const sign = side === "left" ? -1 : 1;
-  const sx = sign * 64;
-  const sy = -228;
-  const hx = sx + sign * 18;
-  const hy = sy + 102;
-  return `<g id="${id}" transform="rotate(${deg} ${sx} ${sy})">
-      <path d="M${sx} ${sy} C ${sx + sign * 8} ${sy + 36}, ${sx + sign * 6} ${sy + 74}, ${hx} ${hy - 8}" fill="none" stroke="${identity.ink}" stroke-width="24" stroke-linecap="round"/>
-      <path d="M${sx} ${sy} C ${sx + sign * 8} ${sy + 36}, ${sx + sign * 6} ${sy + 74}, ${hx} ${hy - 8}" fill="none" stroke="${identity.hoodie}" stroke-width="16" stroke-linecap="round"/>
-      <circle cx="${hx}" cy="${hy}" r="13" fill="${identity.skin}" stroke="${identity.ink}" stroke-width="4"/>
+function hand(id: string, wrist: Point, elbow: Point, identity: CharacterArtIdentity): string {
+  const angle = (Math.atan2(wrist.y - elbow.y, wrist.x - elbow.x) * 180) / Math.PI + 90;
+  return `<g id="${id}" transform="translate(${wrist.x} ${wrist.y}) rotate(${angle.toFixed(1)})">
+      <ellipse cx="-8" cy="-6" rx="3.4" ry="6.5" fill="${identity.skin}" stroke="${identity.ink}" stroke-width="2.5"/>
+      <ellipse cx="0" cy="-8" rx="3.5" ry="7.2" fill="${identity.skin}" stroke="${identity.ink}" stroke-width="2.5"/>
+      <ellipse cx="8" cy="-6" rx="3.4" ry="6.2" fill="${identity.skin}" stroke="${identity.ink}" stroke-width="2.5"/>
+      <ellipse cx="0" cy="4" rx="12" ry="10" fill="${identity.skin}" stroke="${identity.ink}" stroke-width="3"/>
+      <ellipse cx="12" cy="2" rx="3.6" ry="5.5" transform="rotate(40 12 2)" fill="${identity.skin}" stroke="${identity.ink}" stroke-width="2.5"/>
     </g>`;
+}
+
+function arm(
+  id: string,
+  side: "left" | "right",
+  shoulder: Point,
+  elbow: Point,
+  wrist: Point,
+  identity: CharacterArtIdentity,
+): string {
+  return `<g id="${id}">
+      ${capsule(shoulder, elbow, 12, identity.hoodie, identity.ink)}
+      <circle cx="${elbow.x}" cy="${elbow.y}" r="8" fill="${identity.skin}" stroke="${identity.ink}" stroke-width="3"/>
+      ${capsule(elbow, wrist, 9, MAX_PALETTE.hoodieDark, identity.ink)}
+      <circle cx="${wrist.x}" cy="${wrist.y}" r="6" fill="${identity.skin}" stroke="${identity.ink}" stroke-width="3"/>
+      ${hand(side === "left" ? "hand-left" : "hand-right", wrist, elbow, identity)}
+    </g>`;
+}
+
+function gear(point: Point, ink: string): string {
+  return `<g id="story-prop" transform="translate(${point.x} ${point.y})">
+      <circle r="22" fill="#ffe7a0" opacity="0.55"/>
+      <circle r="16" fill="#e2b84a" stroke="${ink}" stroke-width="4"/>
+      <circle r="5" fill="#fff6dc" stroke="${ink}" stroke-width="3"/>
+      <path d="M0 -24 V-16 M0 16 V24 M-24 0 H-16 M16 0 H24" fill="none" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>
+    </g>`;
+}
+
+function engine(ink: string): string {
+  return `<g id="story-engine" transform="translate(228 -168)">
+      <rect x="-40" y="-16" width="80" height="34" rx="8" fill="#6f8f86" stroke="${ink}" stroke-width="4"/>
+      <rect x="-14" y="-32" width="28" height="20" rx="5" fill="#d7d2cb" stroke="${ink}" stroke-width="4"/>
+      <circle cx="24" cy="-2" r="6" fill="#7ec8e3" stroke="${ink}" stroke-width="3"/>
+    </g>`;
+}
+
+function seedling(y: number, ink: string): string {
+  return `<g id="story-seedling" transform="translate(228 ${y})">
+      <path d="M0 16 C3 8 3 2 0 -6" fill="none" stroke="#3f8f55" stroke-width="4" stroke-linecap="round"/>
+      <ellipse cx="-7" cy="-4" rx="8" ry="4" fill="#7fbf6a" stroke="${ink}" stroke-width="3"/>
+      <ellipse cx="7" cy="-2" rx="8" ry="4" fill="#9ed67a" stroke="${ink}" stroke-width="3"/>
+    </g>`;
+}
+
+function flower(point: Point, ink: string): string {
+  return `<g id="story-prop" transform="translate(${point.x} ${point.y})">
+      <path d="M0 28 C6 14 6 6 0 -4" fill="none" stroke="#3f8f55" stroke-width="4" stroke-linecap="round"/>
+      <ellipse cx="0" cy="-16" rx="14" ry="18" fill="#f4e27a" stroke="${ink}" stroke-width="4"/>
+      <ellipse cx="-16" cy="-2" rx="12" ry="7" fill="#f7f3ea" stroke="${ink}" stroke-width="3"/>
+      <ellipse cx="16" cy="-2" rx="12" ry="7" fill="#f7f3ea" stroke="${ink}" stroke-width="3"/>
+      <circle cx="0" cy="-16" r="4" fill="#fff6dc"/>
+    </g>`;
+}
+
+function storyProps(pose: PoseState, ink: string): { behind: string; held: string } {
+  if (pose.interaction === "reach") {
+    return { behind: pose.held ? "" : gear(pose.prop, ink), held: pose.held ? gear(pose.prop, ink) : "" };
+  }
+  if (pose.interaction === "fit") {
+    return {
+      behind: `${engine(ink)}${pose.seated ? gear(pose.prop, ink) : ""}${pose.seedlingY == null ? "" : seedling(pose.seedlingY, ink)}`,
+      held: pose.held ? gear(pose.prop, ink) : "",
+    };
+  }
+  if (pose.interaction === "wave") {
+    return { behind: `${engine(ink)}${flower(pose.prop, ink)}`, held: "" };
+  }
+  return { behind: "", held: "" };
 }
 
 /**
  * One finished frame of the configured character.
  * Geometry, palette, and motion are original ToonForge art. This file does not
  * reuse the OpenMontage schematic (circle head, GSAP, or its sky/ground colors).
+ * Mouth openness is an amplitude or text-pulse approximation, not phoneme alignment.
  */
 export function renderCharacterSvg(identity: CharacterArtIdentity, pose: PoseState): string {
   const title = xml(identity.displayName);
   const id = xml(identity.id);
+  const props = storyProps(pose, identity.ink);
   const hairTufts = identity.messyHair
     ? `<path d="M-46 -448 L-64 -492 L-28 -452 Z" fill="${MAX_PALETTE.hairDark}" stroke="${identity.ink}" stroke-width="3" stroke-linejoin="round"/>
       <path d="M-8 -458 L6 -508 L22 -456 Z" fill="${identity.hair}" stroke="${identity.ink}" stroke-width="3" stroke-linejoin="round"/>
       <path d="M24 -450 L46 -498 L52 -446 Z" fill="${identity.hair}" stroke="${identity.ink}" stroke-width="3" stroke-linejoin="round"/>`
     : "";
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="${title}" data-character-id="${id}" data-display-name="${title}" data-pose="${pose.name}">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="${title}" data-character-id="${id}" data-display-name="${title}" data-pose="${pose.name}" data-interaction="${pose.interaction}" data-mouth-sync="${pose.mouthSync}" data-mouth-open="${pose.mouthOpen}" data-held="${pose.held}" data-seated="${pose.seated}" data-progress="${pose.progress}">
   <rect width="1280" height="720" fill="#f6e2c4"/>
   <rect y="500" width="1280" height="220" fill="#e7c9a4"/>
   <g id="workshop" stroke="${identity.ink}" stroke-width="4" stroke-linejoin="round">
@@ -104,9 +149,9 @@ export function renderCharacterSvg(identity: CharacterArtIdentity, pose: PoseSta
     <rect x="250" y="96" width="46" height="62" rx="8" fill="#7fbfa0"/>
     <rect x="180" y="470" width="920" height="26" rx="6" fill="#8d5a34"/>
   </g>
-  ${storyProp(pose, identity.ink)}
   <g id="character-${id}" transform="translate(640 ${628 + pose.bob})">
     <ellipse cx="0" cy="8" rx="108" ry="16" fill="#000000" opacity="0.16"/>
+    ${props.behind}
     <g id="legs">
       <rect x="-46" y="-86" width="30" height="70" rx="12" fill="#f4efe6" stroke="${identity.ink}" stroke-width="4"/>
       <rect x="16" y="-86" width="30" height="70" rx="12" fill="#f4efe6" stroke="${identity.ink}" stroke-width="4"/>
@@ -118,13 +163,14 @@ export function renderCharacterSvg(identity: CharacterArtIdentity, pose: PoseSta
       <path d="M-42 -136 H-18 V-104 H-42 Z" fill="${MAX_PALETTE.shortsPocket}" stroke="${identity.ink}" stroke-width="3"/>
       <path d="M20 -134 H42 V-104 H20 Z" fill="${MAX_PALETTE.shortsPocket}" stroke="${identity.ink}" stroke-width="3"/>
     </g>
-    ${arm("arm-left", "left", pose.armLeftDeg, identity)}
+    ${arm("arm-left", "left", pose.shoulderLeft, pose.elbowLeft, pose.wristLeft, identity)}
     <g id="hoodie">
       <path d="M-62 -250 Q-84 -176 -58 -148 H58 Q84 -176 62 -250 Q34 -268 0 -270 Q-34 -268 -62 -250 Z" fill="${identity.hoodie}" stroke="${identity.ink}" stroke-width="5" stroke-linejoin="round"/>
       <path d="M-24 -176 H24 V-140 Q0 -128 -24 -140 Z" fill="${MAX_PALETTE.hoodieDark}" stroke="${identity.ink}" stroke-width="4" stroke-linejoin="round"/>
       <circle cx="0" cy="-206" r="5" fill="#d7f4ff" stroke="${identity.ink}" stroke-width="3"/>
     </g>
-    ${arm("arm-right", "right", pose.armRightDeg, identity)}
+    ${arm("arm-right", "right", pose.shoulderRight, pose.elbowRight, pose.wristRight, identity)}
+    ${props.held}
     <g id="head-group" transform="rotate(${pose.headTilt} 0 -330)">
       <path id="hood" d="M-96 -348 C-112 -470 0 -512 0 -512 C0 -512 112 -470 96 -348 C70 -300 24 -312 0 -304 C-24 -312 -70 -300 -96 -348 Z" fill="${MAX_PALETTE.hoodieDark}" stroke="${identity.ink}" stroke-width="5" stroke-linejoin="round"/>
       <ellipse cx="-78" cy="-332" rx="14" ry="18" fill="${identity.skin}" stroke="${identity.ink}" stroke-width="4"/>
@@ -136,7 +182,7 @@ export function renderCharacterSvg(identity: CharacterArtIdentity, pose: PoseSta
         <path d="M-78 -360 C-96 -470 -10 -500 8 -498 C78 -506 102 -430 78 -348 C48 -392 8 -404 -28 -396 C-52 -420 -70 -390 -78 -360 Z" fill="${identity.hair}" stroke="${identity.ink}" stroke-width="4" stroke-linejoin="round"/>
         ${hairTufts}
       </g>
-      <g id="goggles">
+      <g id="goggles" transform="translate(0 ${pose.goggleLift})">
         <path d="M-84 -392 C-36 -414 40 -414 84 -390" fill="none" stroke="#6b5344" stroke-width="8" stroke-linecap="round"/>
         <ellipse cx="-32" cy="-376" rx="26" ry="16" fill="#d7f4ff" stroke="${identity.ink}" stroke-width="4"/>
         <ellipse cx="32" cy="-376" rx="26" ry="16" fill="#d7f4ff" stroke="${identity.ink}" stroke-width="4"/>

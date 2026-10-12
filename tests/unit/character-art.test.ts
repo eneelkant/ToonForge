@@ -8,6 +8,7 @@ import { defaultCharacterRegistry } from "../../src/characters/registry.js";
 import type { CharacterRecord } from "../../src/characters/types.js";
 import {
   buildCharacterFrames,
+  frameEnvelope,
   identityFromCharacter,
   inspectCharacterArtSvg,
   poseState,
@@ -58,6 +59,11 @@ describe("character art identity", () => {
     expect(wonder).toContain('id="story-prop"');
     expect(idle).not.toContain('id="story-prop"');
     expect(wonder).not.toContain('cy="230" r="90"');
+    expect(wonder).not.toContain('stroke-width="24"');
+    expect(idle).toContain('id="hand-left"');
+    expect(idle).toContain('id="hand-right"');
+    expect(idle).toContain('id="arm-left"');
+    expect(wonder).toContain('data-interaction="wave"');
 
     expect(() =>
       identityFromCharacter({
@@ -106,6 +112,63 @@ describe("character art identity", () => {
         fps: 1,
       }),
     ).toThrow(/bolt/);
+  });
+
+  it("moves the hands through reach, fit, and wave instead of holding a static prop", () => {
+    const reachStart = poseState("look", 0, 12, { localTimeSec: 0.05, shotDurationSec: 5, narration: "Max finds a gear" });
+    const reachEnd = poseState("look", 0, 12, { localTimeSec: 4.8, shotDurationSec: 5, narration: "Max finds a gear" });
+    expect(reachEnd.wristRight.x).toBeGreaterThan(reachStart.wristRight.x + 40);
+    expect(reachStart.held).toBe(false);
+    expect(reachEnd.held).toBe(true);
+    expect(reachEnd.prop.x).toBeGreaterThan(reachStart.prop.x);
+
+    const fitStart = poseState("gesture", 0, 12, { localTimeSec: 0, shotDurationSec: 5, narration: "Max fits the gear" });
+    const fitEnd = poseState("gesture", 0, 12, { localTimeSec: 5, shotDurationSec: 5, narration: "Max fits the gear" });
+    expect(fitEnd.prop.x).toBeGreaterThan(fitStart.prop.x + 40);
+    expect(fitStart.held).toBe(true);
+    expect(fitStart.seated).toBe(false);
+    expect(fitEnd.seated).toBe(true);
+    expect(fitStart.seedlingY).toBeNull();
+    expect(fitEnd.seedlingY).not.toBeNull();
+    expect(fitEnd.seedlingY ?? 0).toBeLessThan(-250);
+    expect(reachEnd.goggleLift).toBeLessThan(reachStart.goggleLift - 10);
+
+    const waveStart = poseState("wonder", 0, 12, { localTimeSec: 0.1, shotDurationSec: 6, narration: "Max waves with wonder" });
+    const waveEnd = poseState("wonder", 0, 12, { localTimeSec: 5.5, shotDurationSec: 6, narration: "Max waves with wonder" });
+    expect(waveEnd.wristRight.y).toBeLessThan(waveStart.wristRight.y - 80);
+    expect(waveEnd.prop.y).toBeLessThan(waveStart.prop.y - 80);
+    expect(waveStart.mouthSync).toBe("text-pulses");
+  });
+
+  it("times the mouth from an amplitude envelope and rejects a mismatched frame count", async () => {
+    const silent = frameEnvelope(new Float32Array(16_000), 16_000, 12, 12);
+    expect(new Set(silent).size).toBe(1);
+    const samples = new Float32Array(16_000);
+    for (let index = 7000; index < 9000; index += 1) samples[index] = 0.8;
+    const envelope = frameEnvelope(samples, 16_000, 12, 12);
+    expect(envelope[6]).toBeGreaterThan(envelope[0] ?? 0);
+    expect(() => frameEnvelope(samples, 0, 12, 12)).toThrow(/sample rate/);
+
+    const max = await maxRecord();
+    const board = createStoryboard(storyFor(max, 6));
+    const frames = buildCharacterFrames({
+      characters: [max],
+      storyboard: board,
+      durationSec: 1,
+      fps: 12,
+      mouthOpen: envelope,
+    });
+    expect(frames[6]?.svg).toContain('data-mouth-sync="amplitude-envelope"');
+    expect(frames[0]?.svg).not.toBe(frames[6]?.svg);
+    expect(() =>
+      buildCharacterFrames({
+        characters: [max],
+        storyboard: board,
+        durationSec: 1,
+        fps: 12,
+        mouthOpen: [0.2],
+      }),
+    ).toThrow(/one openness value per frame/);
   });
 });
 

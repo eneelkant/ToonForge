@@ -123,6 +123,62 @@ describe("production audio", () => {
     expect(record.narration).toBe(story.narration);
     expect(bundle.credits).toMatch(/cc-by-3.0/);
     expect(bundle.licenses?.map((item) => item.license).sort()).toEqual(["cc-by-3.0", "public-domain"]);
+    expect(bundle.mixChannels).toBe(1);
+    const recordChannels = JSON.parse(readFileSync(join(dir, "audio", "audio.json"), "utf8")) as { mixChannels: number };
+    expect(recordChannels.mixChannels).toBe(1);
+  }, 30_000);
+
+  it("keeps a stereo music file stereo and does not duplicate a mono bed", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "tf-audio-stereo-"));
+    const music = join(dir, "source.m4a");
+    await execFileAsync("ffmpeg", [
+      "-y",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=180:duration=3",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=520:duration=3",
+      "-filter_complex",
+      "[0:a][1:a]amerge=inputs=2",
+      "-c:a",
+      "aac",
+      music,
+    ]);
+    const bundle = await generateAudioBundle({
+      projectDir: dir,
+      story,
+      mode: "production",
+      targetDurationSec: 2,
+      productionConfig: { ...licensedConfig, musicFile: music },
+      synthesizeWav: async (_text, wavPath) => {
+        await writeWav(wavPath, 1.5);
+      },
+    });
+    expect(bundle.mixChannels).toBe(2);
+    const { stdout } = await execFileAsync(
+      "ffprobe",
+      ["-v", "error", "-select_streams", "a:0", "-show_entries", "stream=channels", "-of", "default=nw=1:nk=1", bundle.mixPath],
+      { encoding: "utf8" },
+    );
+    expect(Number(stdout.trim())).toBe(2);
+    const decoded = await execFileAsync(
+      "ffmpeg",
+      ["-v", "error", "-i", bundle.mixPath, "-f", "f32le", "-ac", "2", "-"],
+      { encoding: "buffer", maxBuffer: 8_000_000 },
+    );
+    const pcm = Buffer.from(decoded.stdout);
+    const samples = new Float32Array(pcm.buffer, pcm.byteOffset, pcm.length / 4);
+    let difference = 0;
+    for (let index = 0; index + 1 < samples.length; index += 2) {
+      difference += Math.abs((samples[index] ?? 0) - (samples[index + 1] ?? 0));
+    }
+    expect(difference).toBeGreaterThan(1);
   }, 30_000);
 
   it("still blocks a development-tone mix in QA", async () => {

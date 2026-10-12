@@ -50,6 +50,8 @@ export function buildCharacterFrames(input: {
   storyboard: Storyboard;
   durationSec: number;
   fps: number;
+  /** One openness value per frame, taken from the fitted narration waveform. */
+  mouthOpen?: number[];
 }): CharacterFrame[] {
   if (input.storyboard.shots.length === 0) {
     throw new ToonForgeError({
@@ -60,19 +62,33 @@ export function buildCharacterFrames(input: {
   }
   const fps = Math.max(1, Math.round(input.fps));
   const frameCount = Math.max(1, Math.round(input.durationSec * fps));
+  if (input.mouthOpen && input.mouthOpen.length !== frameCount) {
+    throw new ToonForgeError({
+      code: "VALIDATION_FAILED",
+      message: "Narration mouth envelope must provide one openness value per frame.",
+      component: "engines.character-art",
+      context: { frames: frameCount, envelope: input.mouthOpen.length },
+    });
+  }
   const identities = new Map<string, CharacterArtIdentity>();
   const frames: CharacterFrame[] = [];
   for (let index = 0; index < frameCount; index += 1) {
     const timeSec = index / fps;
-    const { shot, index: shotIndex } = shotAtTime(input.storyboard.shots, timeSec);
-    const record = characterForShot(input.characters, shot);
+    const placed = shotAtTime(input.storyboard.shots, timeSec);
+    const record = characterForShot(input.characters, placed.shot);
     let identity = identities.get(record.character_id);
     if (!identity) {
       identity = identityFromCharacter(record);
       identities.set(record.character_id, identity);
     }
-    const poseName = poseForShot(shot, shotIndex);
-    const pose = poseState(poseName, index, fps);
+    const poseName = poseForShot(placed.shot, placed.index);
+    const mouthOpen = input.mouthOpen?.[index];
+    const pose = poseState(poseName, index, fps, {
+      localTimeSec: placed.localTimeSec,
+      shotDurationSec: placed.shotDurationSec,
+      narration: placed.shot.narration,
+      mouthOpen,
+    });
     frames.push({
       index,
       timeSec,
