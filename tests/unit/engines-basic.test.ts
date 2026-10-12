@@ -5,7 +5,9 @@ import { createStoryboard, regenerateShot } from "../../src/engines/storyboard/i
 import { runQa } from "../../src/engines/qa/index.js";
 import { FileCharacterRegistry } from "../../src/characters/registry.js";
 import { generateDevThumbnail, generateDevVideo, writeMediaSidecar } from "../../src/core/media.js";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { buildContentPackage } from "../../src/engines/packaging/index.js";
+import { parseDailyRunArgs } from "../../src/cli/daily-args.js";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -85,4 +87,41 @@ describe("engines basics", () => {
     });
     expect(report.verdict).toBe("PASS");
   }, 60_000);
+
+  it("uses an operator concept as original scene beats", async () => {
+    const chars = await new FileCharacterRegistry("characters").list();
+    const story = generateOriginalStory({
+      characters: chars.filter((c) => c.character_id === "max"),
+      durationTarget: 6,
+      episodeConcept: "Max discovers a glowing seed. The seed sprouts into a tiny floating garden. Max reacts with wonder.",
+    });
+    expect(validateStory(story).ok).toBe(true);
+    expect(story.scenes.map((scene) => scene.narration)).toEqual([
+      "Max discovers a glowing seed.",
+      "The seed sprouts into a tiny floating garden.",
+      "Max reacts with wonder.",
+    ]);
+    expect(story.narration).not.toMatch(/We can fix this/);
+    expect(story.scenes.reduce((sum, scene) => sum + scene.duration_seconds, 0)).toBe(6);
+  });
+
+  it("extracts a production thumbnail from the source video and leaves the dev card labeled ffmpeg_dev", async () => {
+    const chars = await new FileCharacterRegistry("characters").list();
+    const story = generateOriginalStory({ characters: chars.slice(0, 1), durationTarget: 6 });
+    const dir = mkdtempSync(join(tmpdir(), "tf-thumb-"));
+    const video = join(dir, "video.mp4");
+    await generateDevVideo({ outPath: video, durationSec: 1, withAudio: false, width: 640, height: 360 });
+    writeMediaSidecar(video, { kind: "openmontage", provider: "openmontage" });
+    const pack = await buildContentPackage({
+      projectDir: dir,
+      story,
+      durationSeconds: 6,
+      sourceVideo: { path: video, kind: "openmontage" },
+    });
+    expect(pack.thumbnailKind).toBe("openmontage");
+    const meta = JSON.parse(readFileSync(`${pack.thumbnailPath}.meta.json`, "utf8")) as { kind: string };
+    expect(meta.kind).toBe("openmontage");
+    expect(parseDailyRunArgs(["--pipeline", "openmontage", "--channel-config", "channel.yaml"]).pipelineMode).toBe("openmontage");
+    expect(() => parseDailyRunArgs(["--pipeline", "fixture"])).toThrow(/pipeline/);
+  }, 30_000);
 });

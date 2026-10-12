@@ -61,13 +61,22 @@ export interface RenderCharacterAnimationInput {
   storyboard: Storyboard;
   brief: string;
   visualStyle?: string;
-  /** Bounded MP4 length passed to character_rig_renderer. The scene plan keeps full timing. */
+  /**
+   * Picture length. Preview callers keep this inside 2–8 seconds.
+   * Production callers pass the storyboard duration.
+   */
   durationSeconds: number;
   fps?: number;
+  /**
+   * When false, OpenMontage still writes design, rig, poses, and the timeline,
+   * and does not render its schematic MP4.
+   */
+  renderVideo?: boolean;
 }
 
 export interface RenderCharacterAnimationResult {
-  videoPath: string;
+  /** Present when renderVideo is not false. */
+  videoPath?: string;
   artifactPaths: string[];
   versions: Record<string, string>;
   characterIds: string[];

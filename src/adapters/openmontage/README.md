@@ -12,7 +12,9 @@ There is no production REST API. The supported programmatic interface used here 
 - `svg_rig_builder`
 - `pose_library_builder`
 - `action_timeline_compiler`
-- `character_rig_renderer` with `render_video: true`
+- `character_rig_renderer` only when `render_video` is true (schematic preview)
+
+Production episodes set `render_video` false and paint original ToonForge character art. The schematic MP4 is not the delivered picture.
 
 `scripts/openmontage_runner.py` launches the configured Python against `OPENMONTAGE_ROOT` and passes a JSON request on stdin. Arguments are an argv array. User input is never interpolated into a shell.
 
@@ -28,4 +30,4 @@ Local character tools themselves do not gate on approval. Their documented cost 
 
 ## Output
 
-Artifacts stay under the project workspace (`<project>/openmontage/`), including `video.mp4`. ToonForge copies a validated file to `<project>/out/video.mp4` and marks it `kind=openmontage`. A successful process exit with a missing or invalid file is a failure.
+Artifacts stay under the project workspace (`<project>/openmontage/`). A schematic `video.mp4` is written only when `render_video` is true. The default episode copies original character art to `<project>/out/video.mp4` and marks it `kind=provider` with provider `toonforge-character-art`. The schematic opt-in keeps `kind=openmontage`. A successful process exit with a missing or invalid file is a failure.

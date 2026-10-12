@@ -46,6 +46,12 @@ production_backend: openmontage   # or reelmimic, or offline_fixture
 
 Or pass `pipelineMode: "openmontage"` to the daily workflow / `toonforge.generate_cartoon`.
 
+```bash
+node dist/cli/index.js workflow run daily --pipeline openmontage --channel-config config/channels/your-channel.yaml
+```
+
+`--publish` still cannot enable a live upload by itself. An optional `episode_concept` on the channel replaces the generic story template with up to three operator-written sentences. Those sentences are the scene beats. They are not fetched from a reference video.
+
 Channel files that omit `production_backend` keep the previous behavior: ReelMimic when `REELMIMIC_ENABLED=true`, otherwise the offline FFmpeg fixture.
 
 ## Character mapping
@@ -58,9 +64,13 @@ ToonForge characters are the identity source. The mapper requires `character_id`
 
 ## Artifacts and validation
 
-The runner may write only under the project workspace `<data>/projects/<id>/openmontage/`. A path outside that directory is rejected. After a zero exit, ToonForge still requires a non-empty video inside the workspace, copies it to `out/video.mp4`, and runs ffprobe. Text files and empty files fail. The sidecar kind is `openmontage`, which is a production media kind for the video. Narration, music, and the thumbnail still come from the existing engines and are marked `ffmpeg_dev`. `ffmpeg_dev` is accepted only when the selected pipeline is `offline_fixture`. An OpenMontage daily run therefore fails QA and does not publish until those assets are production media. That failure is recorded on the workflow; it is not replaced with the offline fixture.
+The runner may write only under the project workspace `<data>/projects/<id>/openmontage/`. A path outside that directory is rejected. After a zero exit, ToonForge still requires a non-empty video inside the workspace, copies it to `out/video.mp4`, and runs ffprobe. Text files and empty files fail. The sidecar kind is `openmontage`, which is a production media kind for the video. The thumbnail for that run is one frame extracted from the rendered MP4 and keeps kind `openmontage`. Narration and music are not development tones on this path. The run speaks the story narration with Piper and mixes a local music file whose license is `public-domain`, `cc0-1.0`, `cc-by-4.0`, or `cc-by-3.0`. Anything else, including a missing model, fails before a tone is written. `ffmpeg_dev` remains the offline fixture only. The Lessac Blizzard voice is a research license and is not an accepted narration model. A public-domain Piper option is `en_US-ljspeech-high`.
 
-Rendered preview length is capped at 8 seconds. The storyboard timeline keeps the full scene timing in `action_timeline.json`. This cap is the local Playwright preview contract, not a switch to another backend.
+The daily workflow passes the channel `duration_seconds` into story generation. Production then renders the storyboard shot sum, which is that requested duration after scene rounding. A preview render (`preview: true`) still clamps to 2–8 seconds. A production render above 120 seconds fails the runaway guard. That guard is not the preview cap. The offline FFmpeg fixture keeps its own 2–8 second clip.
+
+The delivered picture is original ToonForge character art (`kind=provider`, `provider=toonforge-character-art`). OpenMontage still runs `character_spec_generator`, `svg_rig_builder`, `pose_library_builder`, and `action_timeline_compiler` with `render_video: false`, so the schematic MP4 is not the episode. Passing `characterArt: "adapter"` keeps that schematic file and labels it `openmontage`; it is not finished character art. Rasterizing the original SVG needs Playwright and ffmpeg in `OPENMONTAGE_PYTHON`. If they are missing, the job fails and does not substitute the schematic. Muxing pads a shorter audio bed so it does not cut the picture.
+
+Max's arms are filled two-bone limbs with fingered hands. Look, gesture, and wonder move those arms through reach, fit, and wave, and the story prop is held or seated during that action. After the fitted narration exists, the daily workflow re-renders those frames from a 40 ms RMS amplitude envelope of that waveform. Piper's CLI does not emit phoneme timestamps, so this is not phoneme lip-sync. Frames drawn before a voice file exists use a deterministic letter-pulse approximation instead. A stereo licensed music file is mixed as stereo with the mono narration centered in that image. A mono music file stays mono; the pipeline does not duplicate it into two identical channels and call the result stereo. These checks were run on Linux. macOS compatibility is unverified.
 
 ## Approval, cost, and retries
 

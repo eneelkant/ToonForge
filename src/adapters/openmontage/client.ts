@@ -211,7 +211,8 @@ export async function renderCharacterAnimation(
   const mapping = mapCharactersToOpenMontage(input.characters);
   const scenePlan = storyboardToScenePlan(input.storyboard);
   const workspace = resolve(input.workspace);
-  const videoPath = assertInsideWorkspace(workspace, resolve(workspace, "video.mp4"));
+  const renderVideo = input.renderVideo !== false;
+  const videoPath = renderVideo ? assertInsideWorkspace(workspace, resolve(workspace, "video.mp4")) : undefined;
   const estimatedCostUsd = 0;
   const started = Date.now();
   const { response, attempts } = await runOpenMontage(
@@ -220,30 +221,34 @@ export async function renderCharacterAnimation(
     {
       operation: "render",
       workspace,
-      video_output_path: videoPath,
+      ...(videoPath ? { video_output_path: videoPath } : {}),
       characters: mapping.characters,
       scene_plan: { version: scenePlan.version, scenes: scenePlan.scenes },
       style: { visual_style: input.visualStyle || mapping.characters[0]?.style || "cartoon" },
       brief: input.brief,
       duration_seconds: input.durationSeconds,
       fps: input.fps ?? 12,
+      render_video: renderVideo,
       preserved_locally: mapping.preservedLocally,
     },
     run,
   );
-  if (!response.video_path) {
-    throw openMontageError({
-      errorClass: "invalid_output",
-      message: "OpenMontage reported success without a video_path",
-    });
-  }
-  const verifiedVideo = assertInsideWorkspace(workspace, response.video_path);
-  if (!existsSync(verifiedVideo)) {
-    throw openMontageError({
-      errorClass: "invalid_output",
-      message: "OpenMontage video_path does not exist",
-      context: { videoPath: verifiedVideo },
-    });
+  let verifiedVideo: string | undefined;
+  if (renderVideo) {
+    if (!response.video_path) {
+      throw openMontageError({
+        errorClass: "invalid_output",
+        message: "OpenMontage reported success without a video_path",
+      });
+    }
+    verifiedVideo = assertInsideWorkspace(workspace, response.video_path);
+    if (!existsSync(verifiedVideo)) {
+      throw openMontageError({
+        errorClass: "invalid_output",
+        message: "OpenMontage video_path does not exist",
+        context: { videoPath: verifiedVideo },
+      });
+    }
   }
   const ids = response.character_ids ?? [];
   const names = response.display_names ?? [];

@@ -2,7 +2,9 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { OriginalStory } from "../story/index.js";
 import {
+  extractVideoFrame,
   generateDevThumbnail,
+  isProductionMediaKind,
   validateImage,
   writeMediaSidecar,
   type MediaKind,
@@ -25,6 +27,10 @@ export async function buildContentPackage(input: {
   durationSeconds: number;
   /** Generate a real JPEG via FFmpeg (default true). */
   realThumbnail?: boolean;
+  /** When set, the thumbnail is a frame of this video and keeps its media kind. */
+  sourceVideo?: { path: string; kind: MediaKind };
+  /** License credits appended to the description. Required when music is CC-BY. */
+  credits?: string;
 }): Promise<ContentPackage> {
   const dir = join(input.projectDir, "package");
   mkdirSync(dir, { recursive: true });
@@ -32,7 +38,8 @@ export async function buildContentPackage(input: {
   const thumbnailPath = join(dir, "thumbnail.jpg");
   const metadataPath = join(dir, "metadata.json");
   const title = input.story.title.slice(0, 100);
-  const description = `${input.story.logline}\n\nOriginal ToonForge cartoon. Characters: ${input.story.characters.join(", ")}.\n\n#Original #Cartoon #ToonForge`;
+  const credits = input.credits?.trim() ? `\n\nCredits:\n${input.credits.trim()}` : "";
+  const description = `${input.story.logline}\n\nOriginal ToonForge cartoon. Characters: ${input.story.characters.join(", ")}.${credits}\n\n#Original #Cartoon #ToonForge`;
   const tags = ["toonforge", "original", "cartoon", ...input.story.characters].slice(0, 10);
 
   const endSec = Math.min(59, Math.max(1, input.durationSeconds));
@@ -43,7 +50,27 @@ export async function buildContentPackage(input: {
   );
 
   let thumbnailKind: MediaKind = "ffmpeg_dev";
-  if (input.realThumbnail !== false) {
+  if (input.realThumbnail !== false && input.sourceVideo && isProductionMediaKind(input.sourceVideo.kind)) {
+    thumbnailKind = input.sourceVideo.kind;
+    await extractVideoFrame({ videoPath: input.sourceVideo.path, outPath: thumbnailPath });
+    const img = await validateImage(thumbnailPath, {
+      minWidth: 320,
+      minHeight: 180,
+      kindHint: thumbnailKind,
+    });
+    if (!img.ok) {
+      throw new ToonForgeError({
+        code: "VALIDATION_FAILED",
+        message: `Thumbnail invalid: ${img.errors.join("; ")}`,
+        component: "engines.packaging",
+      });
+    }
+    writeMediaSidecar(thumbnailPath, {
+      kind: thumbnailKind,
+      provider: input.sourceVideo.kind,
+      notes: ["Frame extracted from the production video. Not a separate illustration and not an ffmpeg_dev card."],
+    });
+  } else if (input.realThumbnail !== false) {
     await generateDevThumbnail({
       outPath: thumbnailPath,
       width: 1280,

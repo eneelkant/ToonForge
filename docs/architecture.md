@@ -106,7 +106,7 @@ Also observed: a third-party mirror `Fork-Auto-SocialBots/youtube-automation-age
 
 Inspected commit `9327439db69021ab4b0e2776729bf3b58fdb5a87`. License file is GNU AGPL-3.0. Python requires 3.10+. There is no production REST API. The agent drives `pipeline_defs/` and calls `BaseTool.execute()`.
 
-The ToonForge adapter calls only the local character-animation tools (`character_spec_generator`, `svg_rig_builder`, `pose_library_builder`, `action_timeline_compiler`, `character_rig_renderer`) through `scripts/openmontage_runner.py`. It does not download reference footage and does not fall back to another backend when that render fails.
+The ToonForge adapter calls the local character-animation tools (`character_spec_generator`, `svg_rig_builder`, `pose_library_builder`, `action_timeline_compiler`) through `scripts/openmontage_runner.py`. The episode picture is original ToonForge SVG art, not the upstream schematic. `character_rig_renderer` runs only when a caller explicitly asks for that schematic preview. The adapter does not download reference footage and does not fall back to another backend when that render fails.
 
 `pipeline_defs/character-animation.yaml` still requires human approval on several agent stages. ToonForge does not run that agent workflow and does not write fake approvals. See `docs/integrations/openmontage.md`.
 

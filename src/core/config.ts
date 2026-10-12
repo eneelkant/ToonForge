@@ -25,6 +25,11 @@ export const ChannelConfigSchema = z.object({
   risk_threshold: z.number().min(0).max(1).default(0.3),
   /** Explicit production backend. Omitted keeps the historical auto selection. */
   production_backend: z.enum(["offline_fixture", "reelmimic", "openmontage"]).optional(),
+  /**
+   * Optional original episode brief. When set, the story engine uses these
+   * sentences as the scene beats instead of the generic template.
+   */
+  episode_concept: z.string().min(1).max(500).optional(),
 });
 
 export type ChannelConfig = z.infer<typeof ChannelConfigSchema>;

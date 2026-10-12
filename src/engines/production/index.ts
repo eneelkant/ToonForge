@@ -16,6 +16,8 @@ import type { ReelMimicAdapter } from "../../adapters/reelmimic/types.js";
 import type { OpenMontageAdapter } from "../../adapters/openmontage/types.js";
 import { rootLogger } from "../../core/logging.js";
 import type { PipelineMode } from "../reference/index.js";
+import { renderCharacterArt, type CharacterArtRunner } from "../character-art/render.js";
+import { resolveRenderDuration, storyboardDurationSec } from "./duration.js";
 
 const log = rootLogger.child("engines.production");
 
@@ -25,6 +27,7 @@ export interface ProductionResult {
   /** @deprecated use kind — true only for invalid stubs */
   stub: boolean;
   kind: MediaKind;
+  provider: string;
   detail: string;
   mode: PipelineMode;
   reelmimicProjectId?: string;
@@ -62,6 +65,18 @@ export interface ProduceCartoonInput {
   durationSec?: number;
   referencePath?: string;
   referenceUrl?: string;
+  /**
+   * preview keeps the 2–8s Playwright cap.
+   * Production uses the storyboard duration, up to the 120s guard.
+   */
+  preview?: boolean;
+  /**
+   * toonforge draws original character art after OpenMontage returns identity and timing.
+   * adapter keeps the upstream schematic MP4 and must not be described as finished art.
+   */
+  characterArt?: "toonforge" | "adapter";
+  /** Test seam for the character-art rasterizer. */
+  characterArtRun?: CharacterArtRunner;
 }
 
 /**
@@ -159,6 +174,7 @@ export async function produceCartoon(input: ProduceCartoonInput): Promise<Produc
         videoPath,
         stub: false,
         kind: "reelmimic",
+        provider: "reelmimic",
         mode,
         detail: "ReelMimic artifact copied and validated",
         reelmimicProjectId: created.projectId,
@@ -214,6 +230,7 @@ export async function produceCartoon(input: ProduceCartoonInput): Promise<Produc
     videoPath,
     stub: false,
     kind: "ffmpeg_dev",
+    provider: "ffmpeg",
     mode,
     detail: "FFmpeg offline fixture (valid media; not for live publish)",
   };
@@ -271,6 +288,12 @@ async function produceWithOpenMontage(
   const startedAt = new Date().toISOString();
   const workspace = join(input.projectDir, "openmontage");
   mkdirSync(workspace, { recursive: true });
+  const durationSeconds = resolveRenderDuration({
+    requestedSec: input.durationSec,
+    storyboardSec: storyboardDurationSec(input.storyboard),
+    preview: input.preview === true,
+  });
+  const art = input.characterArt ?? "toonforge";
   let rendered;
   try {
     rendered = await input.openmontage.renderCharacterAnimation({
@@ -278,8 +301,9 @@ async function produceWithOpenMontage(
       characters: input.characters,
       storyboard: input.storyboard,
       brief: `${input.story.title}\n\n${input.story.logline}\n\n${input.story.synopsis}`,
-      durationSeconds: Math.min(8, Math.max(2, input.durationSec ?? 3)),
+      durationSeconds,
       fps: 12,
+      renderVideo: art === "adapter",
     });
   } catch (error) {
     if (error instanceof ToonForgeError) throw error;
@@ -290,35 +314,58 @@ async function produceWithOpenMontage(
       cause: error,
     });
   }
-  if (!rendered.videoPath || !existsSync(rendered.videoPath)) {
-    throw new ToonForgeError({
-      code: "VALIDATION_FAILED",
-      message: "OpenMontage finished without a video artifact",
-      component: "engines.production",
+  let kind: MediaKind = "openmontage";
+  let provider = "openmontage";
+  let detail = "OpenMontage schematic rig validated. This is not finished character art.";
+  if (art === "toonforge") {
+    const artResult = await renderCharacterArt({
+      characters: input.characters,
+      storyboard: input.storyboard,
+      outPath: videoPath,
+      framesDir: join(input.projectDir, "character-art"),
+      durationSec: durationSeconds,
+      fps: 12,
+      python: config.openmontage.python || "python3",
+      run: input.characterArtRun,
     });
+    kind = "provider";
+    provider = "toonforge-character-art";
+    detail = `Original ToonForge character art for ${artResult.characterIds.join(", ")}. OpenMontage supplied identity, rig, poses, and the action timeline only. The schematic MP4 was not used.`;
+  } else {
+    if (!rendered.videoPath || !existsSync(rendered.videoPath)) {
+      throw new ToonForgeError({
+        code: "VALIDATION_FAILED",
+        message: "OpenMontage finished without a video artifact",
+        component: "engines.production",
+      });
+    }
+    copyFileSync(rendered.videoPath, videoPath);
   }
-  copyFileSync(rendered.videoPath, videoPath);
   const validation = await validateVideo(videoPath, {
     requireAudio: false,
     minDurationSec: 0.5,
-    kindHint: "openmontage",
+    kindHint: kind,
   });
   if (!validation.ok) {
     throw new ToonForgeError({
       code: "VALIDATION_FAILED",
-      message: `OpenMontage output failed validation: ${validation.errors.join("; ")}`,
+      message: `Production video failed validation: ${validation.errors.join("; ")}`,
       component: "engines.production",
     });
   }
   const endedAt = new Date().toISOString();
   writeMediaSidecar(videoPath, {
-    kind: "openmontage",
-    provider: "openmontage",
+    kind,
+    provider,
     notes: [
       "pipelineMode=openmontage",
+      `characterArt=${art}`,
+      `durationSeconds=${durationSeconds}`,
+      input.preview ? "preview cap 2-8s" : "production storyboard duration",
       `versions=${JSON.stringify(rendered.versions)}`,
       "agentPipelineApproval=not_invoked",
       "reference footage not reused",
+      detail,
     ],
   });
   const openmontage = {
@@ -331,10 +378,13 @@ async function produceWithOpenMontage(
     startedAt,
     endedAt,
   };
-  writeProductionMeta(outDir, input, { kind: "openmontage", mode: "openmontage", openmontage });
+  writeProductionMeta(outDir, input, { kind, mode: "openmontage", openmontage });
   log.info("production.openmontage", {
     projectId: input.projectId,
     videoPath,
+    kind,
+    provider,
+    durationSeconds,
     versions: rendered.versions,
     retryCount: rendered.retryCount,
     actualCostUsd: rendered.actualCostUsd,
@@ -343,9 +393,10 @@ async function produceWithOpenMontage(
     projectId: input.projectId,
     videoPath,
     stub: false,
-    kind: "openmontage",
+    kind,
+    provider,
     mode: "openmontage",
-    detail: "OpenMontage character animation validated",
+    detail,
     openmontage,
   };
 }

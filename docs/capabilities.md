@@ -15,8 +15,8 @@ Status words mean:
 | Characters | implemented local registry | `src/characters` | versioned character JSON | id and required fields | Missing character fails selection. OmniChar continuity is optional and off by default. |
 | Storyboard | implemented | `src/engines/storyboard` | shot list with timings | duration and asset refs | Invalid board stops the workflow. |
 | Cartoon production | provider or explicit fixture | `src/engines/production`, ReelMimic adapter, OpenMontage adapter | MP4 + provenance | ffprobe; kind `reelmimic`, `openmontage`, or `ffmpeg_dev` | Live mode does not fall back to `offline_fixture` after a backend failure. The scheduler skips the job when the selected backend is down. |
-| Voice / dialogue | placeholder unless a provider is configured | `src/engines/audio` | audio file | kind `ffmpeg_dev` in the default path | Live QA blocks `ffmpeg_dev`. There is no bundled TTS model. |
-| Music / SFX | placeholder | audio engine | audio file | same | Same. No bundled music model and no claim of a licensed library. |
+| Voice / dialogue | provider for Piper; placeholder for `offline_fixture` | `src/engines/audio` | audio file | kind `provider` or `ffmpeg_dev` | Production runs fail with setup instructions when Piper is missing. Tones are not relabeled. |
+| Music / SFX | provider for a local licensed file; placeholder for `offline_fixture` | audio engine | audio file | license allowlist and loudness | Non-commercial and share-alike licenses are rejected. No music file is bundled. |
 | Captions, thumbnail, metadata | captions implemented locally; thumbnail is `ffmpeg_dev`; metadata is local text | caption / thumbnail / metadata engines | srt, image, metadata JSON | files exist | Thumbnail kind blocks live publish. |
 | Media validation | implemented | `src/core/media.ts` | ffprobe result | codec, container, duration, streams, required audio | Corrupt or text-named `.mp4` files fail. |
 | QA and provenance | implemented | QA engine | PASS / WARN / FAIL | originality, third-party footage, media kind | `FAIL` stops publish. `WARN` is not eligible for unattended public publish. |

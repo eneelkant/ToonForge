@@ -405,6 +405,7 @@ describe("OpenMontage production routing", () => {
         characters: await defaultCharacterRegistry().list(),
         openmontage: bad,
         mode: "openmontage",
+        characterArt: "adapter",
       }),
     ).rejects.toThrow(/validation|stub|placeholder/i);
 
@@ -437,6 +438,7 @@ describe("OpenMontage production routing", () => {
       characters: await defaultCharacterRegistry().list(),
       openmontage: good,
       mode: "openmontage",
+      characterArt: "adapter",
     });
     expect(result.kind).toBe("openmontage");
     expect(result.mode).toBe("openmontage");
@@ -511,6 +513,91 @@ describe("OpenMontage MCP", () => {
     expect(health).toMatchObject({ status: "disabled" });
     const backends = (await handleTool("toonforge.production_backends", {})) as { selected: string };
     expect(backends.selected).toBe("offline_fixture");
+  });
+});
+
+describe("OpenMontage schematic opt-out", () => {
+  it("does not require a video path when render_video is false", async () => {
+    const workspace = mkdtempSync(join(tmpdir(), "om-novideo-"));
+    const { stdout, code } = await runRunner({
+      operation: "render",
+      root: join(tmpdir(), "not-a-checkout"),
+      workspace,
+      render_video: false,
+      characters: [{ id: "max", display_name: "Max" }],
+      scene_plan: { scenes: [{ id: "s", start_seconds: 0, end_seconds: 1 }] },
+    });
+    expect(code).not.toBe(0);
+    const body = JSON.parse(stdout) as { error_class: string; message: string };
+    expect(body.error_class).toBe("not_installed");
+    expect(body.message).not.toMatch(/video_output_path/);
+  });
+
+  it("accepts a timeline-only result when the schematic MP4 is skipped", async () => {
+    const root = tempCheckout();
+    const workspace = mkdtempSync(join(tmpdir(), "om-timeline-"));
+    const adapter = createOpenMontageAdapter(
+      loadRuntimeConfig({ OPENMONTAGE_ENABLED: "true", OPENMONTAGE_ROOT: root, OPENMONTAGE_PYTHON: "python3" }).openmontage,
+      {
+        run: async (request) => {
+          const body = JSON.parse(request.input) as {
+            render_video: boolean;
+            video_output_path?: string;
+            characters: Array<{ id: string; display_name: string }>;
+          };
+          expect(body.render_video).toBe(false);
+          expect(body.video_output_path).toBeUndefined();
+          return {
+            code: 0,
+            stdout: JSON.stringify({
+              ok: true,
+              versions: { character_spec_generator: "0.1.0" },
+              character_ids: body.characters.map((character) => character.id),
+              display_names: body.characters.map((character) => character.display_name),
+              artifacts: [],
+            }),
+            stderr: "",
+            durationMs: 1,
+            timedOut: false,
+          };
+        },
+      },
+    );
+    const characters = (await defaultCharacterRegistry().list()).filter((character) => character.character_id === "max");
+    const rendered = await adapter.renderCharacterAnimation({
+      workspace,
+      characters,
+      storyboard: createStoryboard({
+        ...story(),
+        characters: ["max"],
+        scenes: [
+          {
+            id: "sc_01",
+            title: "Discovery",
+            action: "Max finds a gear",
+            dialogue: "",
+            narration: "Max finds a gear.",
+            duration_seconds: 18,
+            characters: ["max"],
+          },
+          {
+            id: "sc_02",
+            title: "Wonder",
+            action: "Max reacts",
+            dialogue: "",
+            narration: "Max reacts with wonder.",
+            duration_seconds: 18,
+            characters: ["max"],
+          },
+        ],
+      }),
+      brief: "original",
+      durationSeconds: 36,
+      renderVideo: false,
+    });
+    expect(rendered.videoPath).toBeUndefined();
+    expect(rendered.characterIds).toEqual(["max"]);
+    expect(rendered.displayNames).toEqual(["Max"]);
   });
 });
 

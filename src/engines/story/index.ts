@@ -47,6 +47,8 @@ export function generateOriginalStory(input: {
   formatHints?: StoryFormatHints | null;
   durationTarget?: number;
   format?: "shorts" | "long_form";
+  /** Operator-authored original beats. Not taken from a reference script. */
+  episodeConcept?: string;
 }): OriginalStory {
   const chars = input.characters;
   if (chars.length === 0) {
@@ -67,7 +69,21 @@ export function generateOriginalStory(input: {
     ? hints.scene_structure
     : ["hook", "escalation", "payoff"];
 
-  const scenes: StoryScene[] = structure.slice(0, 4).map((label, index) => {
+  const conceptBeats = conceptSentences(input.episodeConcept);
+  const scenes: StoryScene[] = conceptBeats
+    ? conceptBeats.map((beat, index) => {
+        const durations = beatDurations(Math.max(duration, conceptBeats.length), conceptBeats.length);
+        return {
+          id: `sc_${String(index + 1).padStart(2, "0")}`,
+          title: index === 0 ? "Discovery" : index === conceptBeats.length - 1 ? "Wonder" : "Change",
+          action: beat,
+          dialogue: "",
+          narration: beat,
+          duration_seconds: durations[index] ?? 1,
+          characters: [lead.character_id],
+        };
+      })
+    : structure.slice(0, 4).map((label, index) => {
     const portion = index === 0 ? 0.2 : index === structure.length - 1 ? 0.35 : 0.45 / Math.max(1, structure.length - 2);
     if (label === "hook" || index === 0) {
       return {
@@ -106,7 +122,9 @@ export function generateOriginalStory(input: {
     };
   });
 
-  const title = `${lead.display_name} and the Original Fix`;
+  const title = conceptBeats
+    ? `${lead.display_name}'s Original Moment`
+    : `${lead.display_name} and the Original Fix`;
   const narration = scenes.map((s) => s.narration).join(" ");
   const dialogue = scenes.map((s) => s.dialogue);
   const body = JSON.stringify({ title, scenes, narration, dialogue, topic, hookPattern });
@@ -116,8 +134,10 @@ export function generateOriginalStory(input: {
     story_id: newId("story"),
     trend_id: input.trend?.id,
     title,
-    logline: `An original cartoon short where ${lead.display_name} solves a problem inspired by the theme "${topic}" without copying any reference expression.`,
-    hook: scenes[0]!.dialogue,
+    logline: conceptBeats
+      ? `An original short in which ${lead.display_name} follows an operator-written concept. No reference script is copied.`
+      : `An original cartoon short where ${lead.display_name} solves a problem inspired by the theme "${topic}" without copying any reference expression.`,
+    hook: conceptBeats ? scenes[0]!.narration : scenes[0]!.dialogue,
     synopsis: `Theme: ${topic}. Hook pattern (structure only): ${hookPattern}. ${shotHint}.`,
     characters: chars.map((c) => c.character_id),
     scenes,
@@ -139,6 +159,24 @@ export function generateOriginalStory(input: {
     version: "1.0.0",
     script_hash,
   };
+}
+
+function beatDurations(total: number, count: number): number[] {
+  const base = Math.floor(total / count);
+  const extra = total - base * count;
+  return Array.from({ length: count }, (_, index) => base + (index === count - 1 ? extra : 0));
+}
+
+function conceptSentences(concept: string | undefined): string[] | null {
+  const trimmed = concept?.trim();
+  if (!trimmed) return null;
+  const parts = trimmed.split(/(?<=[.!?])\s+/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 2) return parts.slice(0, 3);
+  return [
+    `${trimmed} The character notices it for the first time.`,
+    "The moment changes into something small and alive.",
+    "The character stops and reacts with wonder.",
+  ];
 }
 
 export function validateStory(story: OriginalStory): { ok: boolean; errors: string[] } {

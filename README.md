@@ -12,7 +12,7 @@ ToonForge is not published to the npm registry. Install from a checkout or a pac
 2. Discovers trends from configured sources. The default source is `manual`. Optional YouTube Data API trends need a separate API key.
 3. Builds an original story and storyboard from structural hints. It does not copy scripts, footage, or characters from a reference.
 4. Renders with the selected backend: `offline_fixture` (FFmpeg, CI/dev), `reelmimic`, or `openmontage`. The last two are separate installs and are off by default.
-5. Adds voice, music, captions, and a thumbnail. Voice, music, and thumbnail in the default path are labeled `ffmpeg_dev` placeholders, not a licensed TTS or music model.
+5. Adds voice, music, captions, and a thumbnail. The offline fixture still uses `ffmpeg_dev` tones. An OpenMontage or ReelMimic run speaks with Piper and a licensed music file, or it stops with setup instructions.
 6. Runs ffprobe and QA. `QA BLOCK` stops publishing.
 7. Writes a dry-run publication manifest unless live publishing is explicitly enabled.
 
@@ -194,7 +194,7 @@ node dist/cli/index.js publish disable-live
 | ReelMimic | Separate MIT install; may need a coding-agent login upstream | Backend reports unavailable; no silent fixture fallback in live mode |
 | OpenMontage | Separate AGPL checkout, Python, FFmpeg | Same |
 | OmniChar | Separate GPL service | Character continuity check skipped unless enabled |
-| TTS / music models | Not bundled | Audio and thumbnail stay `ffmpeg_dev` and fail live QA |
+| TTS / music models | Not bundled | Production runs require Piper plus a YouTube-safe music file. Missing either fails closed. |
 
 No real YouTube account is used by tests or CI.
 

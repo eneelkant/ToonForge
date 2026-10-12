@@ -469,6 +469,12 @@ export async function muxVideoAudio(opts: {
       opts.videoPath,
       "-i",
       opts.audioPath,
+      "-filter_complex",
+      "[1:a]apad[a]",
+      "-map",
+      "0:v:0",
+      "-map",
+      "[a]",
       "-c:v",
       "copy",
       "-c:a",
@@ -479,6 +485,16 @@ export async function muxVideoAudio(opts: {
       opts.outPath,
     ],
     "muxVideoAudio",
+  );
+  return opts.outPath;
+}
+
+/** One decoded frame from an existing video. Does not invent a new picture. */
+export async function extractVideoFrame(opts: { videoPath: string; outPath: string; atSec?: number }): Promise<string> {
+  mkdirSync(dirname(opts.outPath), { recursive: true });
+  await runFfmpeg(
+    ["-ss", String(opts.atSec ?? 0.4), "-i", opts.videoPath, "-frames:v", "1", opts.outPath],
+    "extractVideoFrame",
   );
   return opts.outPath;
 }

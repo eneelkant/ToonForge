@@ -81,12 +81,25 @@ async function main(): Promise<void> {
 
   if (cmd === "workflow" && sub === "run" && rest[0] === "daily") {
     const { runDailyWorkflow } = await import("../engines/workflow/daily.js");
-    const publishFlag = rest.includes("--publish");
-    const mode = resolvePublishMode({ config, requestedLive: publishFlag });
-    if (publishFlag && mode.dryRun) {
+    const { parseDailyRunArgs } = await import("./daily-args.js");
+    let dailyArgs;
+    try {
+      dailyArgs = parseDailyRunArgs(rest.slice(1));
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 2;
+      return;
+    }
+    const mode = resolvePublishMode({ config, requestedLive: dailyArgs.publish });
+    if (dailyArgs.publish && mode.dryRun) {
       console.error(`NOTE: ${mode.reason}`);
     }
-    console.log(JSON.stringify(await runDailyWorkflow({ dryRun: mode.dryRun, publish: publishFlag }), null, 2));
+    console.log(JSON.stringify(await runDailyWorkflow({
+      dryRun: mode.dryRun,
+      publish: dailyArgs.publish,
+      pipelineMode: dailyArgs.pipelineMode,
+      channelPath: dailyArgs.channelPath,
+    }), null, 2));
     return;
   }
 
@@ -143,7 +156,7 @@ Commands:
   system status
   config channel [path]
   workflow start [name]
-  workflow run daily [--publish]
+  workflow run daily [--publish] [--pipeline offline_fixture|reelmimic|openmontage] [--channel-config path]
   workflow status <id>
   mcp
   mcp --http

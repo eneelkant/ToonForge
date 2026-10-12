@@ -9,6 +9,7 @@ import {
   type MediaKind,
 } from "../../core/media.js";
 import { ToonForgeError } from "../../core/errors.js";
+import { generateProductionAudio, type ProductionAudioConfig } from "./production.js";
 
 export interface AudioProvider {
   name: string;
@@ -45,6 +46,11 @@ export interface AudioBundle {
   kind: MediaKind;
   stub: boolean;
   provenance: { provider: string; generated: true; kind: MediaKind };
+  credits?: string;
+  licenses?: Array<{ asset: string; license: string; title: string; attribution: string; sourceUrl: string }>;
+  narrationSha256?: string;
+  /** Present for production mixes. Stereo means the music file had two or more channels. */
+  mixChannels?: number;
 }
 
 export async function generateAudioBundle(input: {
@@ -53,7 +59,36 @@ export async function generateAudioBundle(input: {
   provider?: AudioProvider;
   /** Force real FFmpeg tones even when a mock provider is injected. */
   preferValidMedia?: boolean;
+  /** Production refuses ffmpeg_dev tones. Fixture keeps them for offline_fixture. */
+  mode?: "fixture" | "production";
+  targetDurationSec?: number;
+  env?: NodeJS.ProcessEnv;
+  productionConfig?: ProductionAudioConfig;
+  synthesizeWav?: (text: string, wavPath: string, config: ProductionAudioConfig) => Promise<void>;
 }): Promise<AudioBundle> {
+  if (input.mode === "production") {
+    const produced = await generateProductionAudio({
+      projectDir: input.projectDir,
+      story: input.story,
+      targetDurationSec: input.targetDurationSec ?? 6,
+      config: input.productionConfig,
+      env: input.env,
+      synthesizeWav: input.synthesizeWav,
+    });
+    return {
+      voicePath: produced.voicePath,
+      musicPath: produced.musicPath,
+      mixPath: produced.mixPath,
+      provider: produced.provider,
+      kind: produced.kind,
+      stub: false,
+      provenance: { provider: produced.provider, generated: true, kind: "provider" },
+      credits: produced.credits,
+      licenses: produced.licenses,
+      narrationSha256: produced.narrationSha256,
+      mixChannels: produced.mixChannels,
+    };
+  }
   const preferValid = input.preferValidMedia ?? true;
   const provider = input.provider ?? new FfmpegDevAudioProvider();
   const dir = join(input.projectDir, "audio");

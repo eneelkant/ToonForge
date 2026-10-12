@@ -17,6 +17,8 @@ function readyAdapter(): OpenMontageAdapter {
       return { status: "ready", detail: "test double" };
     },
     async renderCharacterAnimation(input) {
+      expect(input.durationSeconds).toBe(45);
+      expect(input.renderVideo).toBe(true);
       const videoPath = join(input.workspace, "video.mp4");
       await generateDevVideo({ outPath: videoPath, durationSec: 2, withAudio: false, label: "om" });
       return {
@@ -44,16 +46,17 @@ describe("daily workflow OpenMontage selection", () => {
       dataDir,
       pipelineMode: "openmontage",
       openmontage: readyAdapter(),
+      characterArt: "adapter",
     });
-    // Video is production media. Narration, music, and the thumbnail are still
-    // ffmpeg_dev, and only offline_fixture may accept those. QA must fail closed
-    // before any publish manifest is written.
-    expect(result.error).toBe("QA FAIL");
+    // Video is production media. Narration and music are not substituted with
+    // ffmpeg_dev tones. Missing Piper or a licensed music file fails closed
+    // before publish.
+    expect(result.error).toMatch(/Production narration and music are not configured|TOONFORGE_PIPER_MODEL/);
     expect(result.state).toBe("FAILED");
     expect(result.pipelineMode).toBe("openmontage");
-    expect(result.qa.verdict).toBe("FAIL");
-    expect(result.qa.mediaKinds?.video).toBe("openmontage");
+    expect(result.error).not.toMatch(/ffmpeg_dev audio/);
     expect(existsSync(join(dataDir, "publish-manifests"))).toBe(false);
+    expect(existsSync(join(dataDir, "projects", result.projectId, "audio", "mix.m4a"))).toBe(false);
     const projectDir = join(dataDir, "projects", result.projectId);
     const provenance = JSON.parse(readFileSync(join(projectDir, "provenance.json"), "utf8")) as {
       pipelineMode: string;

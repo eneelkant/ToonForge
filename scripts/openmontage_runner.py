@@ -105,7 +105,8 @@ def tool_data(result: Any) -> dict[str, Any]:
 def render(request: dict[str, Any], tools: dict[str, Any]) -> None:
     workspace = contained(resolve_dir("workspace", request.get("workspace")), resolve_dir("workspace", request.get("workspace")))
     workspace.mkdir(parents=True, exist_ok=True)
-    video_path = contained(workspace, resolve_dir("video_output_path", request.get("video_output_path")))
+    render_video = request.get("render_video", True) is not False
+    video_path = contained(workspace, resolve_dir("video_output_path", request.get("video_output_path"))) if render_video else None
     preview_path = contained(workspace, workspace / "preview.html")
     hyperframes = contained(workspace, workspace / "hyperframes")
 
@@ -175,48 +176,54 @@ def render(request: dict[str, Any], tools: dict[str, Any]) -> None:
     if not isinstance(timeline, dict):
         fail("invalid_output", "action_timeline_compiler did not return action_timeline")
 
-    rendered = tool_data(
-        tools["character_rig_renderer"]().execute(
-            {
-                "action_timeline": timeline,
-                "rig_plan": rig,
-                "pose_library": poses,
-                "output_path": str(preview_path),
-                "workspace_path": str(hyperframes),
-                "video_output_path": str(video_path),
-                "render_video": True,
-                "duration_seconds": float(request.get("duration_seconds") or 3),
-                "fps": fps,
-            }
+    reported_path: Path | None = None
+    if render_video:
+        if video_path is None:
+            fail("invalid_configuration", "video_output_path is required when render_video is true")
+        rendered = tool_data(
+            tools["character_rig_renderer"]().execute(
+                {
+                    "action_timeline": timeline,
+                    "rig_plan": rig,
+                    "pose_library": poses,
+                    "output_path": str(preview_path),
+                    "workspace_path": str(hyperframes),
+                    "video_output_path": str(video_path),
+                    "render_video": True,
+                    "duration_seconds": float(request.get("duration_seconds") or 3),
+                    "fps": fps,
+                }
+            )
         )
-    )
-    reported = rendered.get("video_path")
-    if not isinstance(reported, str) or not reported:
-        fail("invalid_output", "character_rig_renderer did not return video_path")
-    reported_path = contained(workspace, Path(reported))
-    if not reported_path.is_file() or reported_path.stat().st_size <= 0:
-        fail("invalid_output", f"rendered video missing or empty: {reported_path}")
+        reported = rendered.get("video_path")
+        if not isinstance(reported, str) or not reported:
+            fail("invalid_output", "character_rig_renderer did not return video_path")
+        reported_path = contained(workspace, Path(reported))
+        if not reported_path.is_file() or reported_path.stat().st_size <= 0:
+            fail("invalid_output", f"rendered video missing or empty: {reported_path}")
+
+    artifacts = [
+        str(design_path),
+        str(rig_path),
+        str(pose_path),
+        str(timeline_path),
+    ]
+    if render_video and reported_path is not None:
+        artifacts.extend([str(preview_path), str(reported_path)])
 
     emit(
         {
             "ok": True,
             "versions": versions_of(tools),
-            "video_path": str(reported_path),
-            "preview_path": str(preview_path),
+            "video_path": str(reported_path) if reported_path is not None else None,
+            "preview_path": str(preview_path) if render_video else None,
             "character_ids": returned_ids,
             "display_names": [
                 str(item.get("display_name"))
                 for item in design.get("characters", [])
                 if isinstance(item, dict) and item.get("display_name")
             ],
-            "artifacts": [
-                str(design_path),
-                str(rig_path),
-                str(pose_path),
-                str(timeline_path),
-                str(preview_path),
-                str(reported_path),
-            ],
+            "artifacts": artifacts,
             "cost_usd": 0,
             "approval": {
                 "agent_pipeline": "not_invoked",
@@ -236,8 +243,9 @@ def main() -> None:
     if operation == "render":
         # Reject escaped outputs before importing the AGPL tree when possible.
         workspace = resolve_dir("workspace", request.get("workspace"))
-        video = resolve_dir("video_output_path", request.get("video_output_path"))
-        contained(workspace, video)
+        if request.get("render_video", True) is not False:
+            video = resolve_dir("video_output_path", request.get("video_output_path"))
+            contained(workspace, video)
         tools = load_tools(root)
         render(request, tools)
     fail("invalid_configuration", f"unsupported operation: {operation}")

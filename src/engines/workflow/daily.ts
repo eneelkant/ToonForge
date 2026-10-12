@@ -14,6 +14,7 @@ import { createStoryboard } from "../storyboard/index.js";
 import { buildContinuityPlan, persistContinuityPlan, validateContinuityPlan } from "../continuity/index.js";
 import { createOmniCharAdapter } from "../../adapters/omnichar/index.js";
 import { produceCartoon } from "../production/index.js";
+import { narrationMouthEnvelope, renderCharacterArt } from "../character-art/index.js";
 import { generateAudioBundle } from "../audio/index.js";
 import { buildContentPackage } from "../packaging/index.js";
 import { runQa } from "../qa/index.js";
@@ -31,7 +32,7 @@ import {
   stamp,
   type ProvenanceRecord,
 } from "../../core/provenance.js";
-import { muxVideoAudio, writeMediaSidecar } from "../../core/media.js";
+import { muxVideoAudio, validateVideo, writeMediaSidecar } from "../../core/media.js";
 import {
   buildOfflineFormatAnalysis,
   resolvePipelineMode,
@@ -80,6 +81,10 @@ export async function runDailyWorkflow(opts: {
   workflowId?: string;
   /** Test seam. Production calls create the adapter from runtime config. */
   openmontage?: OpenMontageAdapter | null;
+  /** Default toonforge draws original art. adapter keeps the schematic MP4 for tests. */
+  characterArt?: "toonforge" | "adapter";
+  /** Keep the 2–8 second preview cap. Production runs leave this unset. */
+  preview?: boolean;
 }): Promise<DailyWorkflowResult> {
   const config = loadRuntimeConfig();
   assertNotKilled(config);
@@ -251,6 +256,7 @@ export async function runDailyWorkflow(opts: {
       formatHints,
       durationTarget: channel.duration_seconds,
       format: channel.format === "long_form" ? "long_form" : "shorts",
+      episodeConcept: channel.episode_concept,
     });
     const storyValidation = validateStory(story);
     if (!storyValidation.ok) throw new Error(`Story invalid: ${storyValidation.errors.join(", ")}`);
@@ -304,9 +310,16 @@ export async function runDailyWorkflow(opts: {
       mode: pipelineMode,
       referencePath: resolved.referencePath,
       referenceUrl: resolved.referenceUrl,
-      durationSec: Math.min(6, Math.max(2, Math.floor(channel.duration_seconds / 15) || 3)),
+      durationSec: channel.duration_seconds,
+      characterArt: opts.characterArt,
+      preview: opts.preview,
     });
-    const videoProvider = production.kind === "reelmimic" ? "reelmimic" : production.kind === "openmontage" ? "openmontage" : "ffmpeg";
+    const videoProvider =
+      production.provider ||
+      (production.kind === "reelmimic" ? "reelmimic" : production.kind === "openmontage" ? "openmontage" : "ffmpeg");
+    if (production.provider === "toonforge-character-art") {
+      provenance.policyNotes.push(production.detail);
+    }
     provenance.generatedAssets.push({
       type: "video",
       path: production.videoPath,
@@ -338,13 +351,66 @@ export async function runDailyWorkflow(opts: {
 
     record = advance(record, "AUDIO");
     persistWorkflow(projectDir, record);
-    const audio = await generateAudioBundle({ projectDir, story, preferValidMedia: true });
+    const videoProbe = await validateVideo(production.videoPath, { requireAudio: false, kindHint: production.kind });
+    const audio = await generateAudioBundle({
+      projectDir,
+      story,
+      preferValidMedia: true,
+      mode: pipelineMode === "offline_fixture" ? "fixture" : "production",
+      targetDurationSec: videoProbe.durationSec && videoProbe.durationSec > 0 ? videoProbe.durationSec : channel.duration_seconds,
+    });
     provenance.generatedAssets.push(
       { type: "audio", path: audio.mixPath, kind: audio.kind, provider: audio.provider },
       { type: "voice", path: audio.voicePath, kind: audio.kind, provider: audio.provider },
       { type: "music", path: audio.musicPath, kind: audio.kind, provider: audio.provider },
     );
+    for (const license of audio.licenses ?? []) {
+      provenance.licenses.push({ asset: license.asset, license: license.license });
+      provenance.externalAssets.push({
+        pathOrUrl: license.sourceUrl,
+        license: license.license,
+        notes: `${license.title}. ${license.attribution}`,
+      });
+    }
+    if (audio.licenses?.length) {
+      provenance.providers.push({ name: audio.provider, role: "narration-and-music" });
+      provenance.policyNotes.push(audio.credits ?? "Production audio licenses recorded.");
+    }
     provenance.timestamps.push(stamp("audio.complete"));
+
+    if (production.provider === "toonforge-character-art") {
+      const fps = 12;
+      const durationSec =
+        videoProbe.durationSec && videoProbe.durationSec > 0 ? videoProbe.durationSec : channel.duration_seconds;
+      const frameCount = Math.max(1, Math.round(durationSec * fps));
+      const mouthOpen = await narrationMouthEnvelope(audio.voicePath, frameCount, fps);
+      await renderCharacterArt({
+        characters,
+        storyboard,
+        outPath: production.videoPath,
+        framesDir: join(projectDir, "character-art"),
+        durationSec,
+        fps,
+        mouthOpen,
+        python: config.openmontage.python || "python3",
+      });
+      const synced = await validateVideo(production.videoPath, { requireAudio: false, kindHint: production.kind });
+      if (!synced.ok) {
+        throw new ToonForgeError({
+          code: "VALIDATION_FAILED",
+          message: `Narration-synced character art failed validation: ${synced.errors.join("; ")}`,
+          component: "engines.workflow.daily",
+        });
+      }
+      provenance.policyNotes.push(
+        "Mouth motion follows a 40 ms RMS envelope of the fitted narration. Piper's CLI does not emit phoneme timestamps, so this is not phoneme lip-sync.",
+      );
+      if (audio.mixChannels === 2) {
+        provenance.policyNotes.push(
+          "The mix is stereo because the licensed music file has two channels. Narration is centered in that stereo image.",
+        );
+      }
+    }
 
     record = advance(record, "ASSEMBLY");
     persistWorkflow(projectDir, record);
@@ -370,12 +436,16 @@ export async function runDailyWorkflow(opts: {
       story,
       durationSeconds: channel.duration_seconds,
       realThumbnail: true,
+      credits: audio.credits,
+      sourceVideo: pipelineMode === "offline_fixture"
+        ? undefined
+        : { path: production.videoPath, kind: production.kind },
     });
     provenance.generatedAssets.push({
       type: "thumbnail",
       path: pack.thumbnailPath,
       kind: pack.thumbnailKind,
-      provider: "ffmpeg",
+      provider: pack.thumbnailKind === "ffmpeg_dev" ? "ffmpeg" : pack.thumbnailKind,
     });
     provenance.generatedAssets.push({
       type: "captions",
@@ -467,7 +537,9 @@ export async function runDailyWorkflow(opts: {
       provenance: {
         originalContent: true,
         thirdPartyFootage: provenance.thirdPartyFootage,
-        licensedAssets: [],
+        licensedAssets: (audio.licenses ?? []).map(
+          (license) => `${license.title} (${license.license}) ${license.attribution} ${license.sourceUrl}`,
+        ),
         notes: story.originality_notes,
       },
       fullProvenance: provenance,
