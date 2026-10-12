@@ -118,7 +118,7 @@ export async function narrationMouthEnvelope(voicePath: string, frameCount: numb
     const result = await execFileAsync(
       "ffmpeg",
       ["-v", "error", "-i", voicePath, "-ac", "1", "-ar", String(sampleRate), "-f", "f32le", "-"],
-      { encoding: "buffer", maxBuffer: 32 * 1024 * 1024, timeout: 60_000 },
+      { encoding: "buffer", maxBuffer: 64 * 1024 * 1024, timeout: 180_000 },
     );
     pcm = result.stdout;
   } catch (error) {
@@ -221,4 +221,49 @@ export async function renderCharacterArt(input: RenderCharacterArtInput): Promis
     frames: frames.length,
     characterIds: [...new Set(frames.map((frame) => frame.characterId))],
   };
+}
+
+/** Rasterize one original SVG still. Used for the episode title card, not for the timeline. */
+export async function rasterizeStill(input: { svg: string; pngPath: string; python: string; timeoutMs?: number }): Promise<void> {
+  const framesDir = join(dirname(input.pngPath), "title-frames");
+  mkdirSync(framesDir, { recursive: true });
+  writeFileSync(join(framesDir, "frame_00000.svg"), input.svg);
+  const script = resolveCharacterArtScript();
+  if (!existsSync(script)) {
+    throw new ToonForgeError({
+      code: "CONFIG_INVALID",
+      message: `Character art renderer script is missing: ${script}`,
+      component: "engines.character-art",
+    });
+  }
+  if (!input.python.trim()) {
+    throw new ToonForgeError({
+      code: "CONFIG_INVALID",
+      message: "Title-card rendering needs OPENMONTAGE_PYTHON with Playwright and ffmpeg installed.",
+      component: "engines.character-art",
+    });
+  }
+  const videoPath = join(dirname(input.pngPath), "title-card.mp4");
+  const payload = JSON.stringify({
+    frames_dir: framesDir,
+    video_output_path: videoPath,
+    still_path: input.pngPath,
+    fps: 1,
+  });
+  const result = await defaultRunner()({
+    command: input.python,
+    args: [script],
+    timeoutMs: input.timeoutMs ?? 120_000,
+    input: payload,
+  });
+  const parsed = parseResponse(result.stdout);
+  if (result.timedOut || result.code !== 0 || parsed.ok !== true || !existsSync(input.pngPath)) {
+    const message = parsed.message || result.stderr.trim() || (result.timedOut ? "Title card render timed out" : "Title card renderer did not write a still");
+    throw new ToonForgeError({
+      code: parsed.error_class === "missing_dependencies" ? "ADAPTER_UNAVAILABLE" : "UPSTREAM_ERROR",
+      message,
+      component: "engines.character-art",
+      context: { errorClass: parsed.error_class ?? "title_card" },
+    });
+  }
 }

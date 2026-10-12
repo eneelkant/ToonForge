@@ -11,12 +11,16 @@ export function publishPreflight(config: RuntimeConfig, channel: ChannelConfig) 
   if (!auth.clientConfigured) blockers.push("oauth_app_missing");
   if (!auth.tokenPresent) blockers.push("authorization_incomplete");
   if (!auth.selectedChannelId) blockers.push("channel_not_selected");
+  if (channel.youtube_channel_id && auth.selectedChannelId && auth.selectedChannelId !== channel.youtube_channel_id) {
+    blockers.push("channel_id_mismatch");
+  }
   if (!livePublishingEnabled(config)) blockers.push("live_publishing_disabled");
   if (channel.schedule.enabled === false) blockers.push("schedule_disabled");
   const backend = channel.production_backend ?? "offline_fixture";
   if (backend === "offline_fixture") blockers.push("offline_fixture_is_not_production_media");
   return {
     channelId: channel.channel_id,
+    configuredYoutubeChannelId: channel.youtube_channel_id ?? null,
     youtubeChannelId: auth.selectedChannelId,
     youtubeChannelTitle: auth.selectedChannelTitle,
     timezone: channel.schedule.timezone,

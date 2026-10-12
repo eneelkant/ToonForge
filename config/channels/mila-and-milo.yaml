@@ -1,0 +1,23 @@
+channel_id: mila-and-milo
+channel_name: Mila & Milo
+niche: original animated history stories, historical tales, ancient civilizations, inventions, explorers, historical mysteries, and biographies
+format: long_form
+schedule:
+  timezone: UTC
+  cron: "0 15 * * *"
+  enabled: false
+characters:
+  - mila
+  - milo-monkey
+style: cartoon
+duration_seconds: 360
+max_daily_videos: 1
+approval_mode: manual
+publishing_mode: private
+trend_sources:
+  - manual
+quality_threshold: 0.7
+risk_threshold: 0.3
+production_backend: openmontage
+youtube_channel_id: UCFW402c826AbgWKtKs_uAyw
+history_episode: episodes/alexandria/episode.json

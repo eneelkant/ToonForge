@@ -2,8 +2,9 @@ import type { CharacterRecord } from "../../characters/types.js";
 import { ToonForgeError } from "../../core/errors.js";
 import type { Storyboard, StoryboardShot } from "../storyboard/index.js";
 import { identityFromCharacter, type CharacterArtIdentity } from "./identity.js";
-import { poseForShot, poseState, shotAtTime, type PoseName } from "./poses.js";
+import { expressionForShot, poseForShot, poseState, shotAtTime, viewForCamera, type PoseName } from "./poses.js";
 import { renderCharacterSvg } from "./svg.js";
+import { renderCastSvg } from "./cast.js";
 
 export interface CharacterFrame {
   index: number;
@@ -13,7 +14,7 @@ export interface CharacterFrame {
   svg: string;
 }
 
-export function characterForShot(characters: CharacterRecord[], shot: StoryboardShot): CharacterRecord {
+export function charactersForShot(characters: CharacterRecord[], shot: StoryboardShot): CharacterRecord[] {
   const ids =
     shot.characters.length > 0
       ? shot.characters
@@ -42,7 +43,11 @@ export function characterForShot(characters: CharacterRecord[], shot: Storyboard
     identityFromCharacter(found);
     resolved.push(found);
   }
-  return resolved[0]!;
+  return resolved;
+}
+
+export function characterForShot(characters: CharacterRecord[], shot: StoryboardShot): CharacterRecord {
+  return charactersForShot(characters, shot)[0]!;
 }
 
 export function buildCharacterFrames(input: {
@@ -75,26 +80,45 @@ export function buildCharacterFrames(input: {
   for (let index = 0; index < frameCount; index += 1) {
     const timeSec = index / fps;
     const placed = shotAtTime(input.storyboard.shots, timeSec);
-    const record = characterForShot(input.characters, placed.shot);
-    let identity = identities.get(record.character_id);
-    if (!identity) {
-      identity = identityFromCharacter(record);
-      identities.set(record.character_id, identity);
-    }
+    const records = charactersForShot(input.characters, placed.shot);
+    const cast = records.map((record) => {
+      let identity = identities.get(record.character_id);
+      if (!identity) {
+        identity = identityFromCharacter(record);
+        identities.set(record.character_id, identity);
+      }
+      return identity;
+    });
     const poseName = poseForShot(placed.shot, placed.index);
     const mouthOpen = input.mouthOpen?.[index];
-    const pose = poseState(poseName, index, fps, {
-      localTimeSec: placed.localTimeSec,
-      shotDurationSec: placed.shotDurationSec,
-      narration: placed.shot.narration,
-      mouthOpen,
-    });
+    const view = viewForCamera(placed.shot.camera);
+    const poses = cast.map((_, castIndex) =>
+      poseState(poseName, index, fps, {
+        localTimeSec: placed.localTimeSec + castIndex * 0.12,
+        shotDurationSec: placed.shotDurationSec,
+        narration: placed.shot.narration,
+        mouthOpen,
+        view,
+        expression: expressionForShot(placed.shot, poseName),
+      }),
+    );
+    const lead = cast[0]!;
+    const pose = poses[0]!;
+    const svg =
+      cast.length === 1 && lead.kind === "max"
+        ? renderCharacterSvg(lead, pose)
+        : renderCastSvg({
+            identities: cast,
+            poses,
+            visual: placed.shot.visual,
+            onScreenText: placed.shot.on_screen_text,
+          });
     frames.push({
       index,
       timeSec,
       pose: pose.name,
-      characterId: identity.id,
-      svg: renderCharacterSvg(identity, pose),
+      characterId: lead.id,
+      svg,
     });
   }
   return frames;

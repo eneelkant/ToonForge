@@ -44,6 +44,8 @@ export async function runQa(input: {
   allowStubVideo?: boolean;
   provenance?: ProvenanceRecord | null;
   expectedDurationSec?: number;
+  /** When set, video and audio must stay within 1.5s of expectedDurationSec. */
+  matchExpectedDuration?: boolean;
   requireAudio?: boolean;
 }): Promise<QaReport> {
   const checks: QaCheck[] = [];
@@ -70,12 +72,15 @@ export async function runQa(input: {
   if (input.videoPath && fileExists("file.video", input.videoPath, true)) {
     const kind = readMediaKind(input.videoPath);
     mediaKinds.video = kind;
+    const matched = input.matchExpectedDuration && input.expectedDurationSec ? input.expectedDurationSec : undefined;
     const validation = await validateVideo(input.videoPath, {
       requireAudio: input.requireAudio ?? true,
-      minDurationSec: 0.5,
-      maxDurationSec: input.expectedDurationSec
-        ? input.expectedDurationSec * 2 + 5
-        : undefined,
+      minDurationSec: matched != null ? Math.max(0.5, matched - 1.5) : 0.5,
+      maxDurationSec: matched != null
+        ? matched + 1.5
+        : input.expectedDurationSec
+          ? input.expectedDurationSec * 2 + 5
+          : undefined,
       kindHint: kind,
     });
     if (!validation.ok) {
@@ -114,7 +119,11 @@ export async function runQa(input: {
   if (input.audioPath && fileExists("file.audio", input.audioPath, false)) {
     const kind = readMediaKind(input.audioPath);
     mediaKinds.audio = kind;
-    const validation = await validateAudio(input.audioPath, { kindHint: kind });
+    const matchedAudio = input.matchExpectedDuration && input.expectedDurationSec ? input.expectedDurationSec : undefined;
+    const validation = await validateAudio(input.audioPath, {
+      kindHint: kind,
+      minDurationSec: matchedAudio != null ? Math.max(0.5, matchedAudio - 1.5) : undefined,
+    });
     if (!validation.ok || kind === "invalid_stub") {
       checks.push({
         id: "media.audio",

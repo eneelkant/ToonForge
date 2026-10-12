@@ -1,0 +1,23 @@
+{
+  "character_id": "milo-monkey",
+  "display_name": "Milo",
+  "canonical_description": "A cheerful little monkey with golden yellow fur, a tan face and belly, large brown eyes, prominent ears, a small muzzle, a small tuft of hair, and a long curled tail. Childlike proportions. No clothing.",
+  "visual_reference": "characters/milo-monkey/visual-reference.md",
+  "omnichar_artifact": null,
+  "voice": {
+    "provider": "piper",
+    "voice_id": "en_US-ljspeech-high",
+    "style_notes": "Warm and playful, still easy to understand"
+  },
+  "personality": ["cheerful", "curious", "gentle"],
+  "wardrobe": ["no clothing"],
+  "allowed_styles": ["cartoon"],
+  "consistency": {
+    "lock_face": true,
+    "lock_palette": true,
+    "max_drift_score": 10
+  },
+  "version": "1.0.0",
+  "created_at": "2026-10-12T00:00:00.000Z",
+  "updated_at": "2026-10-12T00:00:00.000Z"
+}

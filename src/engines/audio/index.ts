@@ -51,6 +51,8 @@ export interface AudioBundle {
   narrationSha256?: string;
   /** Present for production mixes. Stereo means the music file had two or more channels. */
   mixChannels?: number;
+  spokenDurationSec?: number;
+  tempo?: number;
 }
 
 export async function generateAudioBundle(input: {
@@ -87,6 +89,8 @@ export async function generateAudioBundle(input: {
       licenses: produced.licenses,
       narrationSha256: produced.narrationSha256,
       mixChannels: produced.mixChannels,
+      spokenDurationSec: produced.spokenDurationSec,
+      tempo: produced.tempo,
     };
   }
   const preferValid = input.preferValidMedia ?? true;

@@ -67,7 +67,7 @@ export interface ProduceCartoonInput {
   referenceUrl?: string;
   /**
    * preview keeps the 2–8s Playwright cap.
-   * Production uses the storyboard duration, up to the 120s guard.
+   * Production uses the storyboard duration, up to the 600s guard.
    */
   preview?: boolean;
   /**

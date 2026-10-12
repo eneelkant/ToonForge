@@ -13,6 +13,9 @@ const execFileAsync = promisify(execFile);
 /** Licenses that allow a YouTube upload when the required credit is kept. Share-alike and non-commercial terms are rejected. */
 const YOUTUBE_SAFE_LICENSES = new Set(["cc0-1.0", "public-domain", "cc-by-4.0", "cc-by-3.0"]);
 
+/** Matches the long-form storyboard guard. Preview audio is not routed through this function. */
+export const PRODUCTION_AUDIO_MAX_SEC = 600;
+
 export const PRODUCTION_AUDIO_SETUP = [
   "Production narration and music are not configured.",
   "offline_fixture may keep ffmpeg_dev tones. openmontage and reelmimic may not.",
@@ -134,6 +137,8 @@ export async function generateProductionAudio(input: ProductionAudioRequest): Pr
   levels: { voiceMeanDb: number; musicMeanDb: number; mixMaxDb: number };
   /** Channel count of the mix. Stereo is used only when the music file itself is stereo. */
   mixChannels: number;
+  spokenDurationSec: number;
+  tempo: number;
 }> {
   const config = input.config ?? resolveProductionAudioConfig(input.env);
   const narration = input.story.narration?.trim() ?? "";
@@ -141,8 +146,8 @@ export async function generateProductionAudio(input: ProductionAudioRequest): Pr
     throw audioError("Production narration requires the original story narration text.");
   }
   const target = input.targetDurationSec;
-  if (!(target >= 1 && target <= 30)) {
-    throw audioError(`Production audio target duration ${target}s is outside 1–30 seconds.`);
+  if (!(target >= 1 && target <= PRODUCTION_AUDIO_MAX_SEC)) {
+    throw audioError(`Production audio target duration ${target}s is outside 1–${PRODUCTION_AUDIO_MAX_SEC} seconds.`);
   }
   const dir = resolve(input.projectDir, "audio");
   mkdirSync(dir, { recursive: true });
@@ -163,7 +168,7 @@ export async function generateProductionAudio(input: ProductionAudioRequest): Pr
   if (!(spoken > 0.4)) throw audioError("Piper produced no usable narration audio.");
   if (spoken > target * 1.12) {
     throw audioError(
-      `Narration is ${spoken.toFixed(2)}s and the video is ${target.toFixed(2)}s. The script was not time-compressed enough to stay intelligible. Shorten the narration or lengthen the preview.`,
+      `Narration is ${spoken.toFixed(2)}s and the video is ${target.toFixed(2)}s. The script was not time-compressed enough to stay intelligible. Shorten the narration or lengthen the storyboard.`,
     );
   }
   const tempo = spoken > target ? Math.min(1.12, spoken / target) : 1;
@@ -186,7 +191,7 @@ export async function generateProductionAudio(input: ProductionAudioRequest): Pr
     "-i",
     config.musicFile,
     "-af",
-    "loudnorm=I=-30:TP=-2:LRA=11",
+    `loudnorm=I=-30:TP=-2:LRA=11,afade=t=out:st=${Math.max(0, target - 2).toFixed(3)}:d=${Math.min(2, target).toFixed(3)}`,
     "-t",
     target.toFixed(3),
     "-ar",
@@ -304,6 +309,8 @@ export async function generateProductionAudio(input: ProductionAudioRequest): Pr
     licenses,
     levels: { voiceMeanDb: voiceLevel.meanDb, musicMeanDb: musicLevel.meanDb, mixMaxDb: mixLevel.maxDb },
     mixChannels,
+    spokenDurationSec: spoken,
+    tempo,
   };
 }
 
@@ -386,8 +393,8 @@ async function measureVolume(path: string): Promise<{ meanDb: number; maxDb: num
   return { meanDb: mean, maxDb: max };
 }
 
-async function runFfmpeg(args: string[]): Promise<void> {
-  await execFileAsync("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", ...args], { timeout: 120_000 });
+async function runFfmpeg(args: string[], timeoutMs = 900_000): Promise<void> {
+  await execFileAsync("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", ...args], { timeout: timeoutMs });
 }
 
 function isHttpUrl(value: string): boolean {

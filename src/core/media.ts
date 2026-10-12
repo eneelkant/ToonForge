@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -325,11 +325,11 @@ export async function validateImage(
   }
 }
 
-export async function runFfmpeg(args: string[], label: string): Promise<void> {
+export async function runFfmpeg(args: string[], label: string, timeoutMs = 120_000): Promise<void> {
   try {
     await execFileAsync("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", ...args], {
-      timeout: 120_000,
-      maxBuffer: 4 * 1024 * 1024,
+      timeout: timeoutMs,
+      maxBuffer: 8 * 1024 * 1024,
     });
   } catch (error) {
     throw new ToonForgeError({
@@ -485,8 +485,65 @@ export async function muxVideoAudio(opts: {
       opts.outPath,
     ],
     "muxVideoAudio",
+    900_000,
   );
   return opts.outPath;
+}
+
+/** Copy the picture and audio, and add a mov_text subtitle track from an SRT file. */
+export async function embedSubtitleTrack(opts: { videoPath: string; srtPath: string }): Promise<void> {
+  if (!existsSync(opts.srtPath)) {
+    throw new ToonForgeError({
+      code: "VALIDATION_FAILED",
+      message: `Subtitle file is missing: ${opts.srtPath}`,
+      component: "core.media",
+    });
+  }
+  const temp = opts.videoPath.replace(/\.mp4$/i, ".subs.mp4");
+  await runFfmpeg(
+    [
+      "-i",
+      opts.videoPath,
+      "-i",
+      opts.srtPath,
+      "-map",
+      "0:v:0",
+      "-map",
+      "0:a:0?",
+      "-map",
+      "1:0",
+      "-c:v",
+      "copy",
+      "-c:a",
+      "copy",
+      "-c:s",
+      "mov_text",
+      "-metadata:s:s:0",
+      "language=eng",
+      temp,
+    ],
+    "embedSubtitleTrack",
+    900_000,
+  );
+  const probe = await execFileAsync("ffprobe", [
+    "-v",
+    "error",
+    "-select_streams",
+    "s:0",
+    "-show_entries",
+    "stream=codec_name",
+    "-of",
+    "csv=p=0",
+    temp,
+  ], { timeout: 30_000 });
+  if (!String(probe.stdout).includes("mov_text")) {
+    throw new ToonForgeError({
+      code: "VALIDATION_FAILED",
+      message: "Embedded captions were requested, but the muxed file has no mov_text subtitle stream.",
+      component: "core.media",
+    });
+  }
+  renameSync(temp, opts.videoPath);
 }
 
 /** One decoded frame from an existing video. Does not invent a new picture. */

@@ -13,6 +13,8 @@ export interface StoryScene {
   narration: string;
   duration_seconds: number;
   characters: string[];
+  camera?: string;
+  on_screen_text?: string;
 }
 
 /**
