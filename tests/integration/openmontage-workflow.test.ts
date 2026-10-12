@@ -17,7 +17,8 @@ function readyAdapter(): OpenMontageAdapter {
       return { status: "ready", detail: "test double" };
     },
     async renderCharacterAnimation(input) {
-      expect(input.durationSeconds).toBe(8);
+      expect(input.durationSeconds).toBe(45);
+      expect(input.renderVideo).toBe(true);
       const videoPath = join(input.workspace, "video.mp4");
       await generateDevVideo({ outPath: videoPath, durationSec: 2, withAudio: false, label: "om" });
       return {
@@ -45,6 +46,7 @@ describe("daily workflow OpenMontage selection", () => {
       dataDir,
       pipelineMode: "openmontage",
       openmontage: readyAdapter(),
+      characterArt: "adapter",
     });
     // Video is production media. Narration and music are not substituted with
     // ffmpeg_dev tones. Missing Piper or a licensed music file fails closed

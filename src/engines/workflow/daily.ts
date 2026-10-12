@@ -80,6 +80,10 @@ export async function runDailyWorkflow(opts: {
   workflowId?: string;
   /** Test seam. Production calls create the adapter from runtime config. */
   openmontage?: OpenMontageAdapter | null;
+  /** Default toonforge draws original art. adapter keeps the schematic MP4 for tests. */
+  characterArt?: "toonforge" | "adapter";
+  /** Keep the 2–8 second preview cap. Production runs leave this unset. */
+  preview?: boolean;
 }): Promise<DailyWorkflowResult> {
   const config = loadRuntimeConfig();
   assertNotKilled(config);
@@ -306,8 +310,15 @@ export async function runDailyWorkflow(opts: {
       referencePath: resolved.referencePath,
       referenceUrl: resolved.referenceUrl,
       durationSec: channel.duration_seconds,
+      characterArt: opts.characterArt,
+      preview: opts.preview,
     });
-    const videoProvider = production.kind === "reelmimic" ? "reelmimic" : production.kind === "openmontage" ? "openmontage" : "ffmpeg";
+    const videoProvider =
+      production.provider ||
+      (production.kind === "reelmimic" ? "reelmimic" : production.kind === "openmontage" ? "openmontage" : "ffmpeg");
+    if (production.provider === "toonforge-character-art") {
+      provenance.policyNotes.push(production.detail);
+    }
     provenance.generatedAssets.push({
       type: "video",
       path: production.videoPath,
