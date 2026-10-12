@@ -5,6 +5,7 @@ import { ToonForgeError } from "../../core/errors.js";
 import { rootLogger } from "../../core/logging.js";
 import { publishIdempotencyKey } from "../../core/ids.js";
 import type { AdapterAvailability } from "../types.js";
+import { youtubeOAuthMissingMessage, missingYoutubeOAuthVars } from "../../core/env.js";
 import { loadAccounts } from "./account.js";
 import { assertChannelBinding } from "./channel-binding.js";
 import { assertPublishable } from "./gates.js";
@@ -111,10 +112,11 @@ export function createYoutubeAdapter(
     const dryRun = req.dryRun ?? dryRunDefault;
     await assertPublishable({ ...req, idempotencyKey, dryRun });
 
-    if (!dryRun && (!config.clientId || !config.clientSecret)) {
+    const missingOAuth = missingYoutubeOAuthVars(config);
+    if (!dryRun && missingOAuth.length > 0) {
       throw new ToonForgeError({
         code: "CONFIG_INVALID",
-        message: "Live YouTube publish requires YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET",
+        message: youtubeOAuthMissingMessage(missingOAuth),
         component: "adapters.youtube",
       });
     }

@@ -23,8 +23,11 @@ From `.env.example`:
 - `YOUTUBE_CLIENT_ID`
 - `YOUTUBE_CLIENT_SECRET`
 - `YOUTUBE_REDIRECT_URI`
+- `YOUTUBE_CHANNEL_ID`
 - `YOUTUBE_TOKEN_PATH`
 - `DEFAULT_PRIVACY_STATUS`
+
+`toonforge` and the MCP server read the repository-root `.env` when those variables are unset. A value already present in the process environment is left unchanged. CI and deployed processes can inject the variables and omit the file. Missing OAuth names are printed without values. `YOUTUBE_CHANNEL_ID` selects the publish target; it does not prove the Google account controls that channel.
 
 Use Google Cloud OAuth **Desktop** client with YouTube Data API v3 enabled.
 

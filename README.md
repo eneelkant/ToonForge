@@ -92,7 +92,7 @@ Connect the channel you are allowed to manage. ToonForge never asks for a Google
 
 1. In Google Cloud, create an OAuth **desktop** client and enable YouTube Data API v3.
 2. Add redirect URI `http://127.0.0.1:53682/` (or another loopback port above 1024).
-3. Set `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REDIRECT_URI` in `.env`.
+3. Copy `.env.example` to `.env` and set `YOUTUBE_CLIENT_ID` and `YOUTUBE_CLIENT_SECRET`. The CLI, doctor, and MCP server load that file from the repository root. Variables already set in the shell stay as they are, and a missing `.env` is ignored when the environment is injected.
 4. Run:
 
 ```bash

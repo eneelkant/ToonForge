@@ -13,10 +13,13 @@ import {
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { loadProjectEnv } from "../core/env.js";
 import { handleTool, listPrompts, listResources, readResource } from "./handlers.js";
 import { toolSchemaJson } from "./validate.js";
 import { ToonForgeError } from "../core/errors.js";
 import { publicErrorText, workflowProcessCode } from "../engines/workflow/result.js";
+
+loadProjectEnv();
 
 export const MCP_TOOL_NAMES = [
   "toonforge.system_status",
