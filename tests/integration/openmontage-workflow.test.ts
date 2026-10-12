@@ -46,15 +46,15 @@ describe("daily workflow OpenMontage selection", () => {
       pipelineMode: "openmontage",
       openmontage: readyAdapter(),
     });
-    // Video is production media. The thumbnail is a frame of that video.
-    // Narration and music are still ffmpeg_dev, and only offline_fixture may
-    // accept those. QA must fail closed before any publish manifest is written.
-    expect(result.error).toBe("QA FAIL");
+    // Video is production media. Narration and music are not substituted with
+    // ffmpeg_dev tones. Missing Piper or a licensed music file fails closed
+    // before publish.
+    expect(result.error).toMatch(/Production narration and music are not configured|TOONFORGE_PIPER_MODEL/);
     expect(result.state).toBe("FAILED");
     expect(result.pipelineMode).toBe("openmontage");
-    expect(result.qa.verdict).toBe("FAIL");
-    expect(result.qa.mediaKinds?.video).toBe("openmontage");
+    expect(result.error).not.toMatch(/ffmpeg_dev audio/);
     expect(existsSync(join(dataDir, "publish-manifests"))).toBe(false);
+    expect(existsSync(join(dataDir, "projects", result.projectId, "audio", "mix.m4a"))).toBe(false);
     const projectDir = join(dataDir, "projects", result.projectId);
     const provenance = JSON.parse(readFileSync(join(projectDir, "provenance.json"), "utf8")) as {
       pipelineMode: string;

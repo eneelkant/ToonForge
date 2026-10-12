@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { loadRuntimeConfig } from "../core/config.js";
 import { evaluateDependencies } from "../setup/dependencies.js";
 import { getSystemStatus } from "../mcp/tools/system.js";
+import { productionAudioConfigured } from "../engines/audio/production.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -144,6 +145,13 @@ export async function runDoctor(): Promise<void> {
       : JSON.stringify(status.adapters.openmontage),
     remediation:
       "Optional. Install OpenMontage separately, then set OPENMONTAGE_ENABLED=true and OPENMONTAGE_ROOT to that checkout. Do not vendor its AGPL source.",
+  });
+  const productionAudio = productionAudioConfigured();
+  checks.push({
+    name: "provider:narration-music",
+    severity: productionAudio.ok ? "PASS" : "WARN",
+    detail: productionAudio.detail,
+    remediation: "Set Piper and a YouTube-safe music file before an openmontage or reelmimic run. See .env.example.",
   });
   checks.push({
     name: "adapter:orchestrator",

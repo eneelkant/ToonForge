@@ -122,7 +122,7 @@ Point `REELMIMIC_BASE_URL` / `OMNICHAR_BASE_URL` at host services via `host.dock
 | Kind | Meaning | Dry-run | Live YouTube |
 |------|---------|---------|--------------|
 | `reelmimic` | Real ReelMimic output | OK | OK |
-| `openmontage` | Validated OpenMontage character render | OK | OK for the video; audio may still be `ffmpeg_dev` |
+| `openmontage` | Validated OpenMontage character render | OK | OK for the video. Narration and music must be `provider` audio, not `ffmpeg_dev`. |
 | `provider` | Real TTS/brand provider | OK | OK |
 | `ffmpeg_dev` | Valid FFmpeg CI/dev fixture | OK | **BLOCKED** |
 | `invalid_stub` | Text placeholder / `.bin` | **FAIL** | **BLOCKED** |

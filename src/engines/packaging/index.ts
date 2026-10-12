@@ -29,6 +29,8 @@ export async function buildContentPackage(input: {
   realThumbnail?: boolean;
   /** When set, the thumbnail is a frame of this video and keeps its media kind. */
   sourceVideo?: { path: string; kind: MediaKind };
+  /** License credits appended to the description. Required when music is CC-BY. */
+  credits?: string;
 }): Promise<ContentPackage> {
   const dir = join(input.projectDir, "package");
   mkdirSync(dir, { recursive: true });
@@ -36,7 +38,8 @@ export async function buildContentPackage(input: {
   const thumbnailPath = join(dir, "thumbnail.jpg");
   const metadataPath = join(dir, "metadata.json");
   const title = input.story.title.slice(0, 100);
-  const description = `${input.story.logline}\n\nOriginal ToonForge cartoon. Characters: ${input.story.characters.join(", ")}.\n\n#Original #Cartoon #ToonForge`;
+  const credits = input.credits?.trim() ? `\n\nCredits:\n${input.credits.trim()}` : "";
+  const description = `${input.story.logline}\n\nOriginal ToonForge cartoon. Characters: ${input.story.characters.join(", ")}.${credits}\n\n#Original #Cartoon #ToonForge`;
   const tags = ["toonforge", "original", "cartoon", ...input.story.characters].slice(0, 10);
 
   const endSec = Math.min(59, Math.max(1, input.durationSeconds));

@@ -31,7 +31,7 @@ import {
   stamp,
   type ProvenanceRecord,
 } from "../../core/provenance.js";
-import { muxVideoAudio, writeMediaSidecar } from "../../core/media.js";
+import { muxVideoAudio, validateVideo, writeMediaSidecar } from "../../core/media.js";
 import {
   buildOfflineFormatAnalysis,
   resolvePipelineMode,
@@ -339,12 +339,31 @@ export async function runDailyWorkflow(opts: {
 
     record = advance(record, "AUDIO");
     persistWorkflow(projectDir, record);
-    const audio = await generateAudioBundle({ projectDir, story, preferValidMedia: true });
+    const videoProbe = await validateVideo(production.videoPath, { requireAudio: false, kindHint: production.kind });
+    const audio = await generateAudioBundle({
+      projectDir,
+      story,
+      preferValidMedia: true,
+      mode: pipelineMode === "offline_fixture" ? "fixture" : "production",
+      targetDurationSec: videoProbe.durationSec && videoProbe.durationSec > 0 ? videoProbe.durationSec : channel.duration_seconds,
+    });
     provenance.generatedAssets.push(
       { type: "audio", path: audio.mixPath, kind: audio.kind, provider: audio.provider },
       { type: "voice", path: audio.voicePath, kind: audio.kind, provider: audio.provider },
       { type: "music", path: audio.musicPath, kind: audio.kind, provider: audio.provider },
     );
+    for (const license of audio.licenses ?? []) {
+      provenance.licenses.push({ asset: license.asset, license: license.license });
+      provenance.externalAssets.push({
+        pathOrUrl: license.sourceUrl,
+        license: license.license,
+        notes: `${license.title}. ${license.attribution}`,
+      });
+    }
+    if (audio.licenses?.length) {
+      provenance.providers.push({ name: audio.provider, role: "narration-and-music" });
+      provenance.policyNotes.push(audio.credits ?? "Production audio licenses recorded.");
+    }
     provenance.timestamps.push(stamp("audio.complete"));
 
     record = advance(record, "ASSEMBLY");
@@ -371,6 +390,7 @@ export async function runDailyWorkflow(opts: {
       story,
       durationSeconds: channel.duration_seconds,
       realThumbnail: true,
+      credits: audio.credits,
       sourceVideo: pipelineMode === "offline_fixture"
         ? undefined
         : { path: production.videoPath, kind: production.kind },
@@ -471,7 +491,9 @@ export async function runDailyWorkflow(opts: {
       provenance: {
         originalContent: true,
         thirdPartyFootage: provenance.thirdPartyFootage,
-        licensedAssets: [],
+        licensedAssets: (audio.licenses ?? []).map(
+          (license) => `${license.title} (${license.license}) ${license.attribution} ${license.sourceUrl}`,
+        ),
         notes: story.originality_notes,
       },
       fullProvenance: provenance,
