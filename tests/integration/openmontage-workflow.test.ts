@@ -17,6 +17,7 @@ function readyAdapter(): OpenMontageAdapter {
       return { status: "ready", detail: "test double" };
     },
     async renderCharacterAnimation(input) {
+      expect(input.durationSeconds).toBe(8);
       const videoPath = join(input.workspace, "video.mp4");
       await generateDevVideo({ outPath: videoPath, durationSec: 2, withAudio: false, label: "om" });
       return {
@@ -45,9 +46,9 @@ describe("daily workflow OpenMontage selection", () => {
       pipelineMode: "openmontage",
       openmontage: readyAdapter(),
     });
-    // Video is production media. Narration, music, and the thumbnail are still
-    // ffmpeg_dev, and only offline_fixture may accept those. QA must fail closed
-    // before any publish manifest is written.
+    // Video is production media. The thumbnail is a frame of that video.
+    // Narration and music are still ffmpeg_dev, and only offline_fixture may
+    // accept those. QA must fail closed before any publish manifest is written.
     expect(result.error).toBe("QA FAIL");
     expect(result.state).toBe("FAILED");
     expect(result.pipelineMode).toBe("openmontage");

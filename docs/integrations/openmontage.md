@@ -46,6 +46,12 @@ production_backend: openmontage   # or reelmimic, or offline_fixture
 
 Or pass `pipelineMode: "openmontage"` to the daily workflow / `toonforge.generate_cartoon`.
 
+```bash
+node dist/cli/index.js workflow run daily --pipeline openmontage --channel-config config/channels/your-channel.yaml
+```
+
+`--publish` still cannot enable a live upload by itself. An optional `episode_concept` on the channel replaces the generic story template with up to three operator-written sentences. Those sentences are the scene beats. They are not fetched from a reference video.
+
 Channel files that omit `production_backend` keep the previous behavior: ReelMimic when `REELMIMIC_ENABLED=true`, otherwise the offline FFmpeg fixture.
 
 ## Character mapping
@@ -58,9 +64,9 @@ ToonForge characters are the identity source. The mapper requires `character_id`
 
 ## Artifacts and validation
 
-The runner may write only under the project workspace `<data>/projects/<id>/openmontage/`. A path outside that directory is rejected. After a zero exit, ToonForge still requires a non-empty video inside the workspace, copies it to `out/video.mp4`, and runs ffprobe. Text files and empty files fail. The sidecar kind is `openmontage`, which is a production media kind for the video. Narration, music, and the thumbnail still come from the existing engines and are marked `ffmpeg_dev`. `ffmpeg_dev` is accepted only when the selected pipeline is `offline_fixture`. An OpenMontage daily run therefore fails QA and does not publish until those assets are production media. That failure is recorded on the workflow; it is not replaced with the offline fixture.
+The runner may write only under the project workspace `<data>/projects/<id>/openmontage/`. A path outside that directory is rejected. After a zero exit, ToonForge still requires a non-empty video inside the workspace, copies it to `out/video.mp4`, and runs ffprobe. Text files and empty files fail. The sidecar kind is `openmontage`, which is a production media kind for the video. The thumbnail for that run is one frame extracted from the rendered MP4 and keeps kind `openmontage`. Narration and music still come from the development audio engine and are marked `ffmpeg_dev`. `ffmpeg_dev` is accepted only when the selected pipeline is `offline_fixture`. An OpenMontage daily run therefore fails QA and does not publish until narration and music are production media. There is no local speech synthesizer or licensed music library in this package. That failure is recorded on the workflow; it is not replaced with the offline fixture.
 
-Rendered preview length is capped at 8 seconds. The storyboard timeline keeps the full scene timing in `action_timeline.json`. This cap is the local Playwright preview contract, not a switch to another backend.
+The daily workflow passes the channel `duration_seconds` into production. `produceCartoon` then clamps that request to 2–8 seconds. That cap is the local Playwright preview contract, not a switch to another backend. A 45-second channel still renders at most 8 seconds of MP4. The storyboard timeline keeps the full scene timing in `action_timeline.json`. Muxing pads a shorter audio bed so it does not cut the picture.
 
 ## Approval, cost, and retries
 

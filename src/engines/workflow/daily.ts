@@ -251,6 +251,7 @@ export async function runDailyWorkflow(opts: {
       formatHints,
       durationTarget: channel.duration_seconds,
       format: channel.format === "long_form" ? "long_form" : "shorts",
+      episodeConcept: channel.episode_concept,
     });
     const storyValidation = validateStory(story);
     if (!storyValidation.ok) throw new Error(`Story invalid: ${storyValidation.errors.join(", ")}`);
@@ -304,7 +305,7 @@ export async function runDailyWorkflow(opts: {
       mode: pipelineMode,
       referencePath: resolved.referencePath,
       referenceUrl: resolved.referenceUrl,
-      durationSec: Math.min(6, Math.max(2, Math.floor(channel.duration_seconds / 15) || 3)),
+      durationSec: channel.duration_seconds,
     });
     const videoProvider = production.kind === "reelmimic" ? "reelmimic" : production.kind === "openmontage" ? "openmontage" : "ffmpeg";
     provenance.generatedAssets.push({
@@ -370,12 +371,15 @@ export async function runDailyWorkflow(opts: {
       story,
       durationSeconds: channel.duration_seconds,
       realThumbnail: true,
+      sourceVideo: pipelineMode === "offline_fixture"
+        ? undefined
+        : { path: production.videoPath, kind: production.kind },
     });
     provenance.generatedAssets.push({
       type: "thumbnail",
       path: pack.thumbnailPath,
       kind: pack.thumbnailKind,
-      provider: "ffmpeg",
+      provider: pack.thumbnailKind === "ffmpeg_dev" ? "ffmpeg" : pack.thumbnailKind,
     });
     provenance.generatedAssets.push({
       type: "captions",

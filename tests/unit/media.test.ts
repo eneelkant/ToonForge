@@ -54,4 +54,17 @@ describe("media validation + ffmpeg fixtures", () => {
     const img = await validateImage(thumb, { minWidth: 640, minHeight: 360, expectedAspect: 16 / 9 });
     expect(img.ok).toBe(true);
   }, 90_000);
+
+  it("keeps the video duration when the audio bed is shorter", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "tf-mux-"));
+    const video = join(dir, "v.mp4");
+    const audio = join(dir, "a.m4a");
+    const final = join(dir, "final.mp4");
+    await generateDevVideo({ outPath: video, durationSec: 2, withAudio: false });
+    await generateDevAudio({ outPath: audio, durationSec: 0.5 });
+    await muxVideoAudio({ videoPath: video, audioPath: audio, outPath: final });
+    const probed = await validateVideo(final, { requireAudio: true, minDurationSec: 1.5 });
+    expect(probed.ok).toBe(true);
+    expect(probed.durationSec).toBeGreaterThan(1.5);
+  }, 30_000);
 });
