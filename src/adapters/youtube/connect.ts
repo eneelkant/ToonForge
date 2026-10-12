@@ -4,6 +4,9 @@ import { execFile } from "node:child_process";
 import { ToonForgeError } from "../../core/errors.js";
 import type { TokenJson } from "./oauth.js";
 
+/** Loopback callback the local OAuth server binds. Google's registered redirect must match it exactly. */
+export const CANONICAL_YOUTUBE_REDIRECT_URI = "http://127.0.0.1:53682/";
+
 export function newOAuthState(): string {
   return randomBytes(24).toString("hex");
 }

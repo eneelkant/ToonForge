@@ -116,6 +116,26 @@ describe("scheduler", () => {
     expect(second.ran).toHaveLength(0);
   });
 
+  it("does not execute a job when the channel schedule is disabled", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "tf-sched-off-"));
+    const config = loadRuntimeConfig({ TOONFORGE_DATA_DIR: dataDir, TOONFORGE_KILL_SWITCH: "false" });
+    let calls = 0;
+    const result = await runSchedulerTick({
+      dataDir,
+      now: new Date("2026-10-10T07:00:00.000Z"),
+      channels: [channel({ schedule: { timezone: "UTC", cron: "0 6 * * *", enabled: false } })],
+      config,
+      execute: async () => {
+        calls += 1;
+        return { state: "COMPLETE" };
+      },
+    });
+    expect(calls).toBe(0);
+    expect(result.ran).toEqual([]);
+    expect(result.failed).toEqual([]);
+    expect(result.skipped).toEqual([]);
+  });
+
   it("reports a failed workflow execution instead of a success", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "tf-sched-fail-"));
     const config = loadRuntimeConfig({ TOONFORGE_DATA_DIR: dataDir, TOONFORGE_KILL_SWITCH: "false" });

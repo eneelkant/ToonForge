@@ -518,6 +518,8 @@ export async function runDailyWorkflow(opts: {
     const yt = createYoutubeAdapter(config.youtube, {
       dataDir: opts.dataDir ?? config.dataDir,
       dryRunDefault: dryRun,
+      channelPath: opts.channelPath ?? defaultChannelPath(),
+      envTargetChannelId: config.youtube.targetChannelId,
     });
     const publish = await yt.publish({
       idempotencyKey: `pub:${projectId}:video`,

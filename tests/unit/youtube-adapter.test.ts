@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { rememberChannel } from "../../src/adapters/youtube/account.js";
 import { createYoutubeAdapter } from "../../src/adapters/youtube/index.js";
 import type { YoutubeApiClient } from "../../src/adapters/youtube/types.js";
 import {
@@ -124,7 +125,20 @@ describe("youtube adapter", () => {
       getAnalytics: vi.fn(async () => ({ views: 1 })),
       addToPlaylist: vi.fn(async () => undefined),
     };
-    const yt = createYoutubeAdapter(config, { dataDir, apiClient: api, dryRunDefault: false });
+    rememberChannel({
+      dataDir,
+      activeTokenPath: join(dataDir, "token.json"),
+      channelId: "UCFW402c826AbgWKtKs_uAyw",
+      title: "Target",
+      token: { access_token: "fixture-access", refresh_token: "fixture-refresh" },
+      scopes: ["https://www.googleapis.com/auth/youtube.readonly", "https://www.googleapis.com/auth/youtube.upload"],
+    });
+    const yt = createYoutubeAdapter(config, {
+      dataDir,
+      apiClient: api,
+      dryRunDefault: false,
+      envTargetChannelId: "UCFW402c826AbgWKtKs_uAyw",
+    });
     const result = await yt.publish({
       idempotencyKey: "pub:p4:v4",
       projectId: "p4",

@@ -1,9 +1,12 @@
 import { existsSync } from "node:fs";
 import type { RuntimeConfig } from "../../core/config.js";
+import { loadChannelConfig } from "../../core/config.js";
 import { ToonForgeError } from "../../core/errors.js";
 import { rootLogger } from "../../core/logging.js";
 import { publishIdempotencyKey } from "../../core/ids.js";
 import type { AdapterAvailability } from "../types.js";
+import { loadAccounts } from "./account.js";
+import { assertChannelBinding } from "./channel-binding.js";
 import { assertPublishable } from "./gates.js";
 import { hashFile, loadManifest, saveManifest } from "./manifest.js";
 import { createGoogleYoutubeClient, loadTokenFile } from "./oauth.js";
@@ -33,6 +36,12 @@ export interface YoutubeAdapterOptions {
   apiClient?: YoutubeApiClient;
   dataDir?: string;
   dryRunDefault?: boolean;
+  /** Re-read at upload time so a changed channel file cannot reuse an older target. */
+  channelPath?: string;
+  /** Explicit channel-file target when no path is available. Not authenticated identity. */
+  channelYoutubeId?: string;
+  /** YOUTUBE_CHANNEL_ID. Not authenticated identity. */
+  envTargetChannelId?: string;
 }
 
 export function createYoutubeAdapter(
@@ -147,6 +156,15 @@ export function createYoutubeAdapter(
     }
 
     try {
+      const channelYoutubeId = options.channelPath
+        ? loadChannelConfig(options.channelPath).youtube_channel_id
+        : options.channelYoutubeId;
+      // Caller-supplied ids on the request are ignored. Identity comes from the stored channel list.
+      assertChannelBinding({
+        channelYoutubeId,
+        envYoutubeId: options.envTargetChannelId,
+        accounts: loadAccounts(dataDir),
+      });
       const api = resolveClient();
       const uploaded = await api.uploadVideo({
         videoPath: req.videoPath,

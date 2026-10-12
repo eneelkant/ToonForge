@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { ToonForgeError } from "./errors.js";
+import { CANONICAL_YOUTUBE_REDIRECT_URI } from "../adapters/youtube/connect.js";
 
 export const ChannelConfigSchema = z.object({
   channel_id: z.string().min(1),
@@ -20,6 +21,11 @@ export const ChannelConfigSchema = z.object({
   max_daily_videos: z.number().int().positive().default(1),
   approval_mode: z.enum(["manual", "auto"]).default("manual"),
   publishing_mode: z.enum(["schedule", "private", "public"]).default("schedule"),
+  /**
+   * YouTube channel ID this configuration is allowed to publish to.
+   * Authenticated identity still comes from the stored Google channel list.
+   */
+  youtube_channel_id: z.string().regex(/^UC[A-Za-z0-9_-]{22}$/, "youtube_channel_id must be a YouTube channel id").optional(),
   trend_sources: z.array(z.string()).default(["manual"]),
   quality_threshold: z.number().min(0).max(1).default(0.7),
   risk_threshold: z.number().min(0).max(1).default(0.3),
@@ -76,6 +82,8 @@ export interface RuntimeConfig {
     clientId?: string;
     clientSecret?: string;
     redirectUri: string;
+    /** Configured publish target. Not proof that this account controls the channel. */
+    targetChannelId?: string;
     tokenPath: string;
     defaultPrivacy: "private" | "unlisted" | "public";
     dryRunDefault: boolean;
@@ -128,7 +136,8 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     youtube: {
       clientId: env.YOUTUBE_CLIENT_ID,
       clientSecret: env.YOUTUBE_CLIENT_SECRET,
-      redirectUri: env.YOUTUBE_REDIRECT_URI || "http://127.0.0.1",
+      redirectUri: env.YOUTUBE_REDIRECT_URI || CANONICAL_YOUTUBE_REDIRECT_URI,
+      targetChannelId: env.YOUTUBE_CHANNEL_ID?.trim() || undefined,
       tokenPath: env.YOUTUBE_TOKEN_PATH || "./data/youtube-token.json",
       defaultPrivacy: (env.DEFAULT_PRIVACY_STATUS as RuntimeConfig["youtube"]["defaultPrivacy"]) || "private",
       dryRunDefault: env.YOUTUBE_DRY_RUN !== "false",

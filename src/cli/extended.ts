@@ -193,7 +193,12 @@ export async function dispatchExtended(
 
   if (cmd === "publish" && sub === "preflight") {
     const channel = loadChannelConfig(option(tokens, "--channel-config") ?? defaultChannelPath());
-    console.log(JSON.stringify(publishPreflight(config, channel), null, 2));
+    const report = publishPreflight(config, channel);
+    console.log(JSON.stringify(report, null, 2));
+    if (report.channelBinding !== "match") {
+      console.error(`publish preflight failed: ${report.channelBinding}`);
+      process.exitCode = 1;
+    }
     return true;
   }
   if (cmd === "publish" && sub === "enable-live") {
