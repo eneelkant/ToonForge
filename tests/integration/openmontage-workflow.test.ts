@@ -2,7 +2,6 @@ import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { defaultCharacterRegistry } from "../../src/characters/registry.js";
 import { generateDevVideo } from "../../src/core/media.js";
 import type { OpenMontageAdapter } from "../../src/adapters/openmontage/types.js";
 import { runDailyWorkflow } from "../../src/engines/workflow/daily.js";
@@ -40,7 +39,6 @@ function readyAdapter(): OpenMontageAdapter {
 describe("daily workflow OpenMontage selection", () => {
   it("records the OpenMontage backend and keeps reference analysis footage-free", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "tf-om-daily-"));
-    const characters = await defaultCharacterRegistry().list();
     const result = await runDailyWorkflow({
       dryRun: true,
       dataDir,
@@ -71,7 +69,7 @@ describe("daily workflow OpenMontage selection", () => {
     expect(provenance.production.approval).toBe("not_invoked");
     expect(provenance.referenceSources[0]?.footageReused).toBe(false);
     expect(provenance.referenceSources[0]?.analysisOnly).toBe(true);
-    expect(provenance.charactersUsed.map((c) => c.id).sort()).toEqual(characters.map((c) => c.character_id).sort());
+    expect(provenance.charactersUsed.map((c) => c.id).sort()).toEqual(["bolt", "max", "milo"]);
     expect(provenance.generatedAssets.find((a) => a.type === "video")?.kind).toBe("openmontage");
     const production = JSON.parse(readFileSync(join(projectDir, "out", "production.json"), "utf8")) as {
       backend: string;

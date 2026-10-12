@@ -1,9 +1,13 @@
 import type { StoryboardShot } from "../storyboard/index.js";
 import { textMouthOpen } from "./mouth.js";
 
-export const POSE_NAMES = ["idle", "blink", "look", "gesture", "wonder"] as const;
+export const POSE_NAMES = ["idle", "blink", "look", "gesture", "wonder", "point", "read", "examine", "walk", "explain", "react"] as const;
 export type PoseName = (typeof POSE_NAMES)[number];
-export type Interaction = "none" | "reach" | "fit" | "wave";
+export type Interaction = "none" | "reach" | "fit" | "wave" | "point" | "read" | "examine" | "walk" | "explain" | "react";
+export const EXPRESSION_NAMES = ["happy", "curious", "excited", "surprised", "thoughtful", "worried", "confident"] as const;
+export type ExpressionName = (typeof EXPRESSION_NAMES)[number];
+export const VIEW_NAMES = ["front", "three-quarter", "side", "back"] as const;
+export type ViewName = (typeof VIEW_NAMES)[number];
 
 export interface Point {
   x: number;
@@ -38,6 +42,10 @@ export interface PoseState {
   goggleLift: number;
   /** Seedling anchor while the engine lifts it. Null until that action has started. */
   seedlingY: number | null;
+  expression: ExpressionName;
+  view: ViewName;
+  /** Leg swing for a walk cycle. Zero keeps a standing pose. */
+  legSwing: number;
 }
 
 const SHOULDER_L: Point = { x: -62, y: -232 };
@@ -52,20 +60,79 @@ const ENGINE_SOCKET: Point = { x: 228, y: -186 };
 const FLOWER_START: Point = { x: 220, y: -168 };
 const FLOWER_END: Point = { x: 210, y: -340 };
 
+function matchPose(text: string): PoseName | undefined {
+  const rules: Array<{ pattern: RegExp; pose: PoseName }> = [
+    { pattern: /\bwalk/, pose: "walk" },
+    { pattern: /\bpoint|\bmap\b/, pose: "point" },
+    { pattern: /\bread|\bscroll|\bbook\b/, pose: "read" },
+    { pattern: /\bexamin|\bartifact\b/, pose: "examine" },
+    { pattern: /\bexplain|\btakeaway|\bconclusion\b/, pose: "explain" },
+    { pattern: /\breact\b|\bworried\b|\bsurpris/, pose: "react" },
+    { pattern: /\bwonder\b|\bamazed\b|\bcelebrate\b|\bwave/, pose: "wonder" },
+    { pattern: /\bdiscover\b|\blook\b|\bnotice\b|\bfinds?\b|\bglow/, pose: "look" },
+    { pattern: /\bgesture\b|\binvent\b|\bfits?\b|\blifts?\b|\btinker/, pose: "gesture" },
+    { pattern: /\bblink\b/, pose: "blink" },
+  ];
+  let best: { index: number; pose: PoseName } | undefined;
+  for (const rule of rules) {
+    const match = rule.pattern.exec(text);
+    if (!match || match.index < 0) continue;
+    if (!best || match.index < best.index) best = { index: match.index, pose: rule.pose };
+  }
+  return best?.pose;
+}
+
+/**
+ * The shot action decides the pose. Narration can mention a map or a walk
+ * without changing the picture the storyboard asked for.
+ */
 export function poseForShot(shot: Pick<StoryboardShot, "visual" | "narration" | "dialogue">, index: number): PoseName {
-  const text = `${shot.visual} ${shot.narration} ${shot.dialogue}`.toLowerCase();
-  if (/\bwonder\b|\breact\b|\bamazed\b|\bcelebrate\b|\bwave/.test(text)) return "wonder";
-  if (/\bdiscover\b|\blook\b|\bnotice\b|\bfinds?\b|\bglow/.test(text)) return "look";
-  if (/\bgesture\b|\binvent\b|\bfits?\b|\blifts?\b|\btinker/.test(text)) return "gesture";
-  if (/\bblink\b/.test(text)) return "blink";
+  const fromAction = matchPose(shot.visual.toLowerCase());
+  if (fromAction) return fromAction;
+  const fromSpeech = matchPose(`${shot.narration} ${shot.dialogue}`.toLowerCase());
+  if (fromSpeech) return fromSpeech;
   const cycle: PoseName[] = ["look", "gesture", "wonder"];
   return cycle[index % cycle.length] ?? "idle";
+}
+
+/** A word in the shot action can select an expression. Otherwise the pose supplies one. */
+export function expressionForShot(shot: Pick<StoryboardShot, "visual">, pose: PoseName): ExpressionName {
+  const text = shot.visual.toLowerCase();
+  if (/\bworried\b|\bconcern/.test(text)) return "worried";
+  if (/\bexcited\b|\bamaz/.test(text)) return "excited";
+  if (/\bsurpris/.test(text)) return "surprised";
+  if (/\bthoughtful\b|\bthink/.test(text)) return "thoughtful";
+  if (/\bconfident\b/.test(text)) return "confident";
+  if (/\bcurious\b/.test(text)) return "curious";
+  if (/\bhappy\b|\bcheer/.test(text)) return "happy";
+  return expressionForPose(pose);
+}
+
+export function viewForCamera(camera: string): ViewName {
+  const text = camera.toLowerCase();
+  if (/\bback\b/.test(text)) return "back";
+  if (/\bside\b|\bprofile\b/.test(text)) return "side";
+  if (/three/.test(text)) return "three-quarter";
+  return "front";
+}
+
+export function expressionForPose(name: PoseName): ExpressionName {
+  if (name === "point" || name === "look" || name === "examine") return "curious";
+  if (name === "read") return "thoughtful";
+  if (name === "walk") return "happy";
+  if (name === "explain" || name === "gesture") return "confident";
+  if (name === "wonder") return "excited";
+  if (name === "react") return "surprised";
+  return "happy";
 }
 
 export function interactionForPose(name: PoseName): Interaction {
   if (name === "look") return "reach";
   if (name === "gesture") return "fit";
   if (name === "wonder") return "wave";
+  if (name === "point" || name === "read" || name === "examine" || name === "walk" || name === "explain" || name === "react") {
+    return name;
+  }
   return "none";
 }
 
@@ -73,7 +140,14 @@ export function poseState(
   name: PoseName,
   frame: number,
   fps: number,
-  timing?: { localTimeSec?: number; shotDurationSec?: number; mouthOpen?: number; narration?: string },
+  timing?: {
+    localTimeSec?: number;
+    shotDurationSec?: number;
+    mouthOpen?: number;
+    narration?: string;
+    view?: ViewName;
+    expression?: ExpressionName;
+  },
 ): PoseState {
   const safeFps = Math.max(1, fps);
   const shotDuration = Math.max(0.2, timing?.shotDurationSec ?? 3);
@@ -108,6 +182,9 @@ export function poseState(
     prop: joints.prop,
     goggleLift: interaction === "reach" ? Math.round(-smooth(progress) * 18) : 0,
     seedlingY: seedlingLift(interaction, progress),
+    expression: timing?.expression ?? expressionForPose(name),
+    view: timing?.view ?? "front",
+    legSwing: interaction === "walk" ? Math.round(Math.sin(local * Math.PI * 2 * 1.4) * 18) : 0,
   };
 }
 
@@ -125,6 +202,12 @@ function faceFor(name: PoseName, blinking: boolean): Pick<PoseState, "headTilt" 
     look: { headTilt: -8, pupilX: 7, pupilY: -2, eyeScaleY: 1, eyeRy: 16, browLift: -2 },
     gesture: { headTilt: 4, pupilX: 3, pupilY: -1, eyeScaleY: 1, eyeRy: 16, browLift: -1 },
     wonder: { headTilt: -5, pupilX: 1, pupilY: -5, eyeScaleY: 1.16, eyeRy: 20, browLift: -8 },
+    point: { headTilt: -6, pupilX: 8, pupilY: -2, eyeScaleY: 1, eyeRy: 16, browLift: -4 },
+    read: { headTilt: 10, pupilX: 0, pupilY: 4, eyeScaleY: 0.9, eyeRy: 15, browLift: 2 },
+    examine: { headTilt: 8, pupilX: 4, pupilY: 3, eyeScaleY: 1, eyeRy: 16, browLift: -2 },
+    walk: { headTilt: -2, pupilX: 2, pupilY: 0, eyeScaleY: 1, eyeRy: 16, browLift: -1 },
+    explain: { headTilt: -3, pupilX: 1, pupilY: -1, eyeScaleY: 1, eyeRy: 16, browLift: -3 },
+    react: { headTilt: -8, pupilX: 0, pupilY: -4, eyeScaleY: 1.2, eyeRy: 20, browLift: -10 },
   }[name];
   return { ...base, eyeScaleY: blinking ? 0.12 : base.eyeScaleY };
 }
@@ -182,6 +265,43 @@ function jointsFor(interaction: Interaction, progress: number, local: number): {
       wristLeft,
       wristRight,
       prop,
+      held: false,
+      seated: false,
+    };
+  }
+  if (interaction === "point" || interaction === "explain" || interaction === "react") {
+    const lift = interaction === "react" ? 1 : smooth(Math.min(1, progress * 1.3));
+    const raised = interaction === "react" ? { x: 70, y: -330 } : interaction === "point" ? { x: 168, y: -236 } : { x: 110, y: -300 };
+    return {
+      elbowLeft: interaction === "react" ? { x: -90, y: -250 } : REST_ELBOW_L,
+      elbowRight: lerp(REST_ELBOW_R, { x: 120, y: -250 }, lift),
+      wristLeft: interaction === "react" ? lerp(REST_WRIST_L, { x: -80, y: -320 }, lift) : REST_WRIST_L,
+      wristRight: lerp(REST_WRIST_R, raised, lift),
+      prop: raised,
+      held: false,
+      seated: false,
+    };
+  }
+  if (interaction === "read" || interaction === "examine") {
+    const focus = interaction === "read" ? { x: 36, y: -168 } : { x: 48, y: -140 };
+    return {
+      elbowLeft: { x: -36, y: -190 },
+      elbowRight: { x: 70, y: -188 },
+      wristLeft: { x: focus.x - 36, y: focus.y + 8 },
+      wristRight: { x: focus.x + 10, y: focus.y + 6 },
+      prop: focus,
+      held: true,
+      seated: false,
+    };
+  }
+  if (interaction === "walk") {
+    const swing = Math.sin(local * Math.PI * 2 * 1.4);
+    return {
+      elbowLeft: { x: REST_ELBOW_L.x, y: REST_ELBOW_L.y + swing * 10 },
+      elbowRight: { x: REST_ELBOW_R.x, y: REST_ELBOW_R.y - swing * 10 },
+      wristLeft: { x: REST_WRIST_L.x + swing * 16, y: REST_WRIST_L.y },
+      wristRight: { x: REST_WRIST_R.x - swing * 16, y: REST_WRIST_R.y },
+      prop: { x: 0, y: 0 },
       held: false,
       seated: false,
     };

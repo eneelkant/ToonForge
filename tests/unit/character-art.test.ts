@@ -179,7 +179,9 @@ describe("preview and production duration", () => {
     expect(resolveRenderDuration({ storyboardSec: 1, preview: true })).toBe(2);
     expect(resolveRenderDuration({ requestedSec: 45, storyboardSec: 18 })).toBe(18);
     expect(resolveRenderDuration({ storyboardSec: 45 })).toBe(45);
-    expect(() => resolveRenderDuration({ storyboardSec: PRODUCTION_DURATION_MAX_SEC + 1 })).toThrow(/120/);
+    expect(resolveRenderDuration({ storyboardSec: 360 })).toBe(360);
+    expect(resolveRenderDuration({ storyboardSec: 420 })).toBe(420);
+    expect(() => resolveRenderDuration({ storyboardSec: PRODUCTION_DURATION_MAX_SEC + 1 })).toThrow(/600/);
     expect(() => resolveRenderDuration({ storyboardSec: 1 })).toThrow(/at least 2/);
   });
 });

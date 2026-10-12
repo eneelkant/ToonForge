@@ -14,6 +14,7 @@ export interface StoryboardShot {
   visual: string;
   transition: string;
   audio_cues: string[];
+  on_screen_text?: string;
 }
 
 export interface Storyboard {
@@ -32,12 +33,13 @@ export function createStoryboard(story: OriginalStory): Storyboard {
       scene_id: scene.id,
       order,
       duration_seconds: scene.duration_seconds,
-      camera: order === 1 ? "push-in" : "static",
+      camera: scene.camera ?? (order === 1 ? "push-in" : "static"),
       framing: order === 1 ? "close-up" : "medium",
       characters: scene.characters,
       dialogue: scene.dialogue,
       narration: scene.narration,
       visual: scene.action,
+      on_screen_text: scene.on_screen_text,
       transition: order === story.scenes.length ? "fade-out" : "cut",
       audio_cues: ["sfx:whoosh", "music:underscore"],
     });

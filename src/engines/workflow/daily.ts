@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { loadChannelConfig, loadRuntimeConfig, assertNotKilled } from "../../core/config.js";
-import { defaultChannelPath } from "../../core/paths.js";
+import { defaultChannelPath, resolveBundled } from "../../core/paths.js";
 import { resolvePublishMode } from "../../core/publish-mode.js";
 import { ToonForgeError } from "../../core/errors.js";
 import { youtubeStatus } from "../../adapters/youtube/account.js";
@@ -14,7 +14,8 @@ import { createStoryboard } from "../storyboard/index.js";
 import { buildContinuityPlan, persistContinuityPlan, validateContinuityPlan } from "../continuity/index.js";
 import { createOmniCharAdapter } from "../../adapters/omnichar/index.js";
 import { produceCartoon } from "../production/index.js";
-import { narrationMouthEnvelope, renderCharacterArt } from "../character-art/index.js";
+import { identityFromCharacter, narrationMouthEnvelope, rasterizeStill, renderCharacterArt, renderTitleCard } from "../character-art/index.js";
+import { historyCredits, loadHistoryEpisode, storyFromHistoryEpisode, type HistoryEpisode } from "../history/episode.js";
 import { generateAudioBundle } from "../audio/index.js";
 import { buildContentPackage } from "../packaging/index.js";
 import { runQa } from "../qa/index.js";
@@ -32,7 +33,7 @@ import {
   stamp,
   type ProvenanceRecord,
 } from "../../core/provenance.js";
-import { muxVideoAudio, validateVideo, writeMediaSidecar } from "../../core/media.js";
+import { embedSubtitleTrack, muxVideoAudio, validateVideo, writeMediaSidecar } from "../../core/media.js";
 import {
   buildOfflineFormatAnalysis,
   resolvePipelineMode,
@@ -105,6 +106,13 @@ export async function runDailyWorkflow(opts: {
     channelBackend: channel.production_backend,
     preferOfflineFixture: true,
   });
+  if (channel.history_episode && pipelineMode === "offline_fixture") {
+    throw new ToonForgeError({
+      code: "VALIDATION_FAILED",
+      message: `Channel ${channel.channel_id} has a history episode. Refusing the offline fixture. Use the configured production backend.`,
+      component: "engines.workflow.daily",
+    });
+  }
 
   const projectId = opts.projectId ?? newId("proj");
   const workflowId = opts.workflowId ?? newId("wf_daily");
@@ -249,15 +257,34 @@ export async function runDailyWorkflow(opts: {
       }
     }
     const formatHints = toStoryFormatHints(analysisReport!);
-    const story = generateOriginalStory({
-      trend: selected,
-      characters,
-      reference: analysisReport,
-      formatHints,
-      durationTarget: channel.duration_seconds,
-      format: channel.format === "long_form" ? "long_form" : "shorts",
-      episodeConcept: channel.episode_concept,
-    });
+    let historyEpisode: HistoryEpisode | undefined;
+    let story;
+    if (channel.history_episode) {
+      const episodePath = resolveBundled(channel.history_episode);
+      historyEpisode = loadHistoryEpisode(episodePath);
+      writeFileSync(join(projectDir, "research.json"), JSON.stringify(historyEpisode, null, 2));
+      story = storyFromHistoryEpisode(historyEpisode, characters);
+      provenance.policyNotes.push(
+        "History episode research was loaded from the channel file. Documented claims, disputed interpretations, legends, and dramatized guide dialogue stay labeled in research.json.",
+      );
+      for (const source of historyEpisode.sources) {
+        provenance.policyNotes.push(`Source ${source.id}: ${source.title}. ${source.url}`);
+        provenance.externalAssets.push({
+          pathOrUrl: source.url,
+          notes: `${source.title}. Supports: ${source.supports}`,
+        });
+      }
+    } else {
+      story = generateOriginalStory({
+        trend: selected,
+        characters,
+        reference: analysisReport,
+        formatHints,
+        durationTarget: channel.duration_seconds,
+        format: channel.format === "long_form" ? "long_form" : "shorts",
+        episodeConcept: channel.episode_concept,
+      });
+    }
     const storyValidation = validateStory(story);
     if (!storyValidation.ok) throw new Error(`Story invalid: ${storyValidation.errors.join(", ")}`);
     writeFileSync(join(projectDir, "story.json"), JSON.stringify(story, null, 2));
@@ -420,6 +447,20 @@ export async function runDailyWorkflow(opts: {
       audioPath: audio.mixPath,
       outPath: assembledPath,
     });
+    let brandedStillPath: string | undefined;
+    if (historyEpisode && production.provider === "toonforge-character-art") {
+      const titleSvg = renderTitleCard(characters.map((character) => identityFromCharacter(character)), story.title);
+      brandedStillPath = join(projectDir, "package", "title-card.png");
+      await rasterizeStill({
+        svg: titleSvg,
+        pngPath: brandedStillPath,
+        python: config.openmontage.python || "python3",
+      });
+    }
+    const spoken = audio.spokenDurationSec ?? 0;
+    const speechTimelineSec = (audio.tempo ?? 1) > 1 || spoken <= 0
+      ? undefined
+      : Math.min(spoken, videoProbe.durationSec && videoProbe.durationSec > 0 ? videoProbe.durationSec : spoken);
     writeMediaSidecar(assembledPath, {
       kind: production.kind,
       provider: videoProvider,
@@ -431,16 +472,33 @@ export async function runDailyWorkflow(opts: {
       kind: production.kind,
       provider: videoProvider,
     });
+    const researchCredits = historyEpisode ? historyCredits(historyEpisode) : "";
     const pack = await buildContentPackage({
       projectDir,
       story,
-      durationSeconds: channel.duration_seconds,
+      durationSeconds: historyEpisode ? story.duration_target : channel.duration_seconds,
       realThumbnail: true,
-      credits: audio.credits,
+      credits: [audio.credits, researchCredits].filter(Boolean).join("\n"),
+      captionScenes: historyEpisode
+        ? story.scenes.map((scene) => ({ narration: scene.narration, duration_seconds: scene.duration_seconds, title: scene.title }))
+        : undefined,
+      speechTimelineSec,
+      brandedStillPath,
       sourceVideo: pipelineMode === "offline_fixture"
         ? undefined
         : { path: production.videoPath, kind: production.kind },
     });
+    if (historyEpisode) {
+      if (!pack.captionsSrt) {
+        throw new ToonForgeError({
+          code: "VALIDATION_FAILED",
+          message: "History episode packaging did not write an SRT caption file.",
+          component: "engines.workflow.daily",
+        });
+      }
+      await embedSubtitleTrack({ videoPath: assembledPath, srtPath: pack.captionsSrt });
+      provenance.policyNotes.push("Captions were embedded as a mov_text track and written as WebVTT and SRT.");
+    }
     provenance.generatedAssets.push({
       type: "thumbnail",
       path: pack.thumbnailPath,
@@ -470,7 +528,8 @@ export async function runDailyWorkflow(opts: {
       thirdPartyFootage: provenance.thirdPartyFootage,
       allowDevFixtures,
       provenance,
-      expectedDurationSec: channel.duration_seconds,
+      expectedDurationSec: historyEpisode ? story.duration_target : channel.duration_seconds,
+      matchExpectedDuration: Boolean(historyEpisode),
       requireAudio: true,
     });
     writeFileSync(join(projectDir, "qa.json"), JSON.stringify(qa, null, 2));
@@ -518,6 +577,23 @@ export async function runDailyWorkflow(opts: {
       dataDir: opts.dataDir ?? config.dataDir,
       dryRunDefault: dryRun,
     });
+    let privacyStatus = config.youtube.defaultPrivacy;
+    if (channel.youtube_channel_id && privacyStatus === "public") {
+      privacyStatus = "private";
+      provenance.policyNotes.push(
+        "Public privacy was changed to private. A public upload needs a later confirmation that names this video.",
+      );
+    }
+    if (!dryRun && channel.youtube_channel_id) {
+      const selectedChannel = youtubeStatus(config, opts.dataDir ?? config.dataDir);
+      if (selectedChannel.selectedChannelId !== channel.youtube_channel_id) {
+        throw new ToonForgeError({
+          code: "VALIDATION_FAILED",
+          message: `Connected YouTube channel ${selectedChannel.selectedChannelId ?? "(none)"} does not match ${channel.youtube_channel_id}.`,
+          component: "engines.workflow.daily",
+        });
+      }
+    }
     const publish = await yt.publish({
       idempotencyKey: `pub:${projectId}:video`,
       projectId,
@@ -531,7 +607,7 @@ export async function runDailyWorkflow(opts: {
         title: pack.title,
         description: pack.description,
         tags: pack.tags,
-        privacyStatus: config.youtube.defaultPrivacy,
+        privacyStatus,
         thumbnailPath: pack.thumbnailPath,
       },
       provenance: {

@@ -4,9 +4,14 @@ import { ToonForgeError } from "../../core/errors.js";
 export const PREVIEW_DURATION_MIN_SEC = 2;
 export const PREVIEW_DURATION_MAX_SEC = 8;
 
-/** Runaway guard for a full storyboard. This is not the preview cap. */
+/**
+ * Runaway guard for a full storyboard. This is not the preview cap.
+ * Long-form history episodes are allowed through 600 seconds, which is the
+ * channel maximum. Shorter storyboards, including the earlier 16-second proof,
+ * still render at their own shot sum.
+ */
 export const PRODUCTION_DURATION_MIN_SEC = 2;
-export const PRODUCTION_DURATION_MAX_SEC = 120;
+export const PRODUCTION_DURATION_MAX_SEC = 600;
 
 export function storyboardDurationSec(storyboard: { shots: Array<{ duration_seconds: number }> }): number {
   return storyboard.shots.reduce((sum, shot) => sum + (Number.isFinite(shot.duration_seconds) ? shot.duration_seconds : 0), 0);

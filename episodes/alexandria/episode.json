@@ -1,0 +1,242 @@
+{
+  "topic": "How the Great Library of Alexandria became legendary",
+  "audience": "children and general audiences",
+  "learning_objective": "Separate what ancient and modern sources actually say about the Library of Alexandria from later legends, and notice when two sources disagree.",
+  "title": "How the Great Library of Alexandria Became Legendary",
+  "guides_are_fictional": true,
+  "sources": [
+    {
+      "id": "britannica-el-abbadi",
+      "title": "Library of Alexandria",
+      "author": "Mostafa El-Abbadi",
+      "url": "https://www.britannica.com/topic/Library-of-Alexandria",
+      "inspected": true,
+      "accessed": "2026-10-12",
+      "supports": "The library belonged to the Mouseion. Demetrius of Phaleron advised Ptolemy I and was charged around 295 BCE with founding the library and Mouseion. The Letter of Aristeas presents it as a universal collection, mostly Greek. Ship searches and the Athenian tragedians deposit are reported stories, the second from Galen."
+    },
+    {
+      "id": "perseus-plutarch-caesar-49",
+      "title": "Plutarch, Life of Caesar, chapter 49",
+      "author": "Plutarch, translated by Bernadotte Perrin, 1919",
+      "url": "https://www.perseus.tufts.edu/hopper/text?doc=Perseus%3Atext%3A1999.01.0244%3Achapter%3D49",
+      "inspected": true,
+      "accessed": "2026-10-12",
+      "supports": "Plutarch says Caesar's fire spread from the dockyards and destroyed the great library. A note in this edition says the destruction can have been only partial."
+    },
+    {
+      "id": "openlearn-destruction",
+      "title": "Library of Alexandria: 3 The destruction of the library",
+      "author": "The Open University, OpenLearn",
+      "url": "https://www.open.edu/openlearn/mod/oucontent/view.php?id=19050&section=3",
+      "inspected": true,
+      "accessed": "2026-10-12",
+      "supports": "Compares Plutarch, Dio, Ammianus, Gibbon, and the later Arab-conquest story. Plutarch wrote at least a century later. Dio's wording can mean book warehouses rather than the library building. The Serapeum daughter library was unlikely to be hit by the harbor fire. The bath-furnace story appears centuries later and is widely treated as fiction. Bagnall's gradual-loss argument is presented as a serious alternative to a single disaster."
+    }
+  ],
+  "claims": [
+    {
+      "text": "The Library of Alexandria was part of the Mouseion, and Demetrius of Phaleron was charged by Ptolemy I around 295 BCE with founding the library and the Mouseion.",
+      "status": "documented",
+      "sources": [
+        "britannica-el-abbadi"
+      ]
+    },
+    {
+      "text": "Ancient reports say the Ptolemies searched ships for books and that Ptolemy III kept the Athenian originals of the tragic poets after leaving a deposit.",
+      "status": "documented",
+      "sources": [
+        "britannica-el-abbadi"
+      ]
+    },
+    {
+      "text": "Plutarch says the harbor fire of 48 or 47 BCE spread from the dockyards and destroyed the great library, but the edition's note says that loss can have been only partial, and OpenLearn reads Dio as describing warehouses of books and grain.",
+      "status": "disputed",
+      "sources": [
+        "perseus-plutarch-caesar-49",
+        "openlearn-destruction"
+      ]
+    },
+    {
+      "text": "A story that seventh-century Arab conquerors burned the library's books to heat the baths for six months appears centuries later and is not treated here as fact.",
+      "status": "legend",
+      "sources": [
+        "openlearn-destruction"
+      ]
+    },
+    {
+      "text": "Mila and Milo speak as present-day guides. Their lines are drama, not quotations from ancient people, and they were not witnesses.",
+      "status": "dramatization",
+      "sources": []
+    }
+  ],
+  "scenes": [
+    {
+      "id": "sc_01",
+      "title": "Guides, not witnesses",
+      "duration_seconds": 26,
+      "characters": [
+        "mila",
+        "milo-monkey"
+      ],
+      "camera": "wide front",
+      "on_screen_text": "Guides, not witnesses",
+      "action": "Mila points at a map of Alexandria while Milo walks up beside her.",
+      "dialogue": "Mila: We are telling this story. We were not there.",
+      "narration": "Mila and Milo are guides in this story. They were not alive in ancient Alexandria, and they were not witnesses to anything you are about to hear. Their words are a play we wrote, not quotations from the past. The question they are carrying is a careful one. How did the Great Library of Alexandria become a legend?"
+    },
+    {
+      "id": "sc_02",
+      "title": "A library inside a museum",
+      "duration_seconds": 28,
+      "characters": [
+        "mila",
+        "milo-monkey"
+      ],
+      "camera": "three-quarter",
+      "on_screen_text": "The Mouseion",
+      "action": "Mila explains beside library shelves while Milo listens.",
+      "dialogue": "",
+      "narration": "Encyclopaedia Britannica, in an article by Mostafa El-Abbadi, says the famous library was part of a research institute in Alexandria called the Mouseion, a shrine of the Muses. The same article says Demetrius of Phaleron, a scholar who advised King Ptolemy the First, was charged around two hundred ninety-five B.C.E. with founding the library and the Mouseion. That is a founding story with a name, a king, and a date, and it comes from a modern reference work we read."
+    },
+    {
+      "id": "sc_03",
+      "title": "A hunger for books",
+      "duration_seconds": 29,
+      "characters": [
+        "mila",
+        "milo-monkey"
+      ],
+      "camera": "front",
+      "on_screen_text": "Mostly Greek",
+      "action": "Milo examines a scroll while Mila reads beside him.",
+      "dialogue": "",
+      "narration": "Britannica quotes an ancient text called the Letter of Aristeas. That letter says the library was meant to hold the writings of all people, as far as they were worth serious attention. The article also says the largest share of the books was Greek, and that the work done in the city makes it likely the Greek books were gathered there. So we can say the aim was huge. We cannot roll a surviving catalog onto this table, because no shelf list from the library itself has come down to us."
+    },
+    {
+      "id": "sc_04",
+      "title": "Stories about collecting",
+      "duration_seconds": 31,
+      "characters": [
+        "mila",
+        "milo-monkey"
+      ],
+      "camera": "side",
+      "on_screen_text": "Ancient reports",
+      "action": "Mila points at a harbor map. Milo holds a copied scroll.",
+      "dialogue": "Milo: This part is a report, not a receipt.",
+      "narration": "Some collection stories are exciting, and they need a label. Britannica says the rulers reportedly searched every ship that entered the harbor. If a book was found, it could be copied, and the copy given back, while the library kept what it wanted. Those books were marked from the ships. Another story, which the article traces to the physician Galen, says Ptolemy the Third borrowed the official Athenian copies of the tragic poets, left a huge deposit of silver, and then sent copies home while keeping the originals. Those are ancient reports. They are not the same thing as a modern inventory."
+    },
+    {
+      "id": "sc_05",
+      "title": "The harbor fire",
+      "duration_seconds": 34,
+      "characters": [
+        "mila",
+        "milo-monkey"
+      ],
+      "camera": "wide three-quarter",
+      "on_screen_text": "48 or 47 BCE",
+      "action": "The background shows a harbor. Mila reacts and Milo looks worried.",
+      "dialogue": "",
+      "narration": "Now the famous fire. In forty-eight or forty-seven B.C.E., Julius Caesar was caught in a war in Alexandria. We read Plutarch's Life of Caesar, chapter forty-nine, in Bernadotte Perrin's English translation on the Perseus Digital Library. Plutarch says that when the enemy tried to cut off Caesar's fleet, Caesar used fire. The fire spread from the dockyards and destroyed the great library. A note printed with that translation says the destruction can have been only partial. Plutarch himself does not give a count of the books."
+    },
+    {
+      "id": "sc_06",
+      "title": "Two ancient versions",
+      "duration_seconds": 33,
+      "characters": [
+        "mila",
+        "milo-monkey"
+      ],
+      "camera": "front",
+      "on_screen_text": "Library, or warehouses?",
+      "action": "Mila and Milo examine two different scrolls on a table.",
+      "dialogue": "Mila: Same war. Not the same sentence.",
+      "narration": "The Open University's OpenLearn course on the library says Plutarch's account is short, and that he wrote at least a century after the fire. The course then looks at Cassius Dio, who wrote even later. OpenLearn says Dio's Greek is talking about warehouses that held grain and books, not clearly about the library building. Some translations still use the word library. A word choice can change the story. We did not inspect Dio's Greek ourselves in this pass. We are reporting OpenLearn's reading of it, and we are telling you that."
+    },
+    {
+      "id": "sc_07",
+      "title": "Where did it stand?",
+      "duration_seconds": 29,
+      "characters": [
+        "mila",
+        "milo-monkey"
+      ],
+      "camera": "three-quarter",
+      "on_screen_text": "Location unknown",
+      "action": "Mila points at a map and Milo walks along the table.",
+      "dialogue": "",
+      "narration": "OpenLearn also says we do not know the library's exact position and layout. If the building stood away from the harbor, a dock fire is harder to connect to the whole collection. A much later writer, Ammianus Marcellinus, connects Caesar's fire to the Serapeum. OpenLearn says that temple stood some distance from the harbor, and that scholars agree it housed a daughter library. That daughter collection was unlikely to be the one struck by the harbor fire. Two libraries, or two parts of a library, should not be mashed into one picture."
+    },
+    {
+      "id": "sc_08",
+      "title": "The Serapeum in 391",
+      "duration_seconds": 31,
+      "characters": [
+        "mila",
+        "milo-monkey"
+      ],
+      "camera": "front",
+      "on_screen_text": "391 CE, a daughter library",
+      "action": "Milo reads a later book while Mila explains.",
+      "dialogue": "",
+      "narration": "Another date people remember is three ninety-one C.E., when the Serapeum was attacked. OpenLearn discusses Edward Gibbon, who treated that attack as the real end of the library and said the collection had risen again in the temple of Serapis. Gibbon was writing in the seventeen seventies and seventeen eighties, more than a thousand years later. A daughter library may have lost books in three ninety-one. OpenLearn says we do not know what those shelves held, so we cannot honestly say that one day erased a universal library."
+    },
+    {
+      "id": "sc_09",
+      "title": "A legend about the baths",
+      "duration_seconds": 31,
+      "characters": [
+        "mila",
+        "milo-monkey"
+      ],
+      "camera": "back",
+      "on_screen_text": "Legend, not a source from the time",
+      "action": "Milo holds a scroll marked as a legend while Mila reacts.",
+      "dialogue": "Milo: Six months of bath fires is a story people liked.",
+      "narration": "There is a third story. It says Arab conquerors in the seventh century burned the books to heat the city's baths for six months. OpenLearn points out that this tale shows up about six centuries after the events, and that it asks us to believe a huge library survived the earlier damage and then vanished in a way that sounds like folklore. The course says many scholars, including Bernard Lewis, treat that story as fiction. We will not say it as fact. Milo's scroll is labeled legend so the picture matches the words."
+    },
+    {
+      "id": "sc_10",
+      "title": "A quieter explanation",
+      "duration_seconds": 34,
+      "characters": [
+        "mila",
+        "milo-monkey"
+      ],
+      "camera": "three-quarter",
+      "on_screen_text": "Not one villain",
+      "action": "Mila explains the conclusion. Milo examines a small artifact.",
+      "dialogue": "",
+      "narration": "So what can we say? OpenLearn follows the historian Roger Bagnall and treats a single villain as a tempting story and a weak one. The harbor fire probably destroyed a significant number of books. It is unlikely that every scroll disappeared that day. The course says Myrto Hatzimichali has shown evidence for library work in Roman Alexandria afterward. It also says the early two hundred seventies, when the emperor Aurelian fought in the city, may have damaged buildings, but no contemporary source says the library ended then. Gradual loss is less cinematic. It fits the sources better than one perfect disaster."
+    },
+    {
+      "id": "sc_11",
+      "title": "Why the legend grew",
+      "duration_seconds": 27,
+      "characters": [
+        "mila",
+        "milo-monkey"
+      ],
+      "camera": "front",
+      "on_screen_text": "A big idea, a simple ending",
+      "action": "Mila and Milo walk past the shelves and point back at the map.",
+      "dialogue": "Mila: A giant library makes people want a giant ending.",
+      "narration": "The library became legendary because people wanted it to be the place where all knowledge lived, and then wanted one disaster to explain why that knowledge was gone. The pages we checked do not support that simple ending. They support a real Ptolemaic research library, a collection that was large and mostly Greek, a harbor fire that ancient writers describe in different ways, later damage that is easy to mix together, and a legend that grew in the retelling."
+    },
+    {
+      "id": "sc_12",
+      "title": "Takeaway and credits",
+      "duration_seconds": 27,
+      "characters": [
+        "mila",
+        "milo-monkey"
+      ],
+      "camera": "wide front",
+      "on_screen_text": "Who wrote it? How much later?",
+      "action": "Mila explains the takeaway. Milo waves beside the map.",
+      "dialogue": "",
+      "narration": "Here is the takeaway. When a history story is exciting, ask three questions. Who wrote it? How long after the events? And does another source say something else? Mila and Milo will keep those questions. They are guides in our century. They were not witnesses from Alexandria. The sources for this episode are El-Abbadi's Britannica article, Plutarch on Perseus, and the Open University OpenLearn course, section three. The music is Carefree by Kevin MacLeod, under a Creative Commons Attribution license."
+    }
+  ]
+}

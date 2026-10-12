@@ -1,0 +1,23 @@
+{
+  "character_id": "mila",
+  "display_name": "Mila",
+  "canonical_description": "An adventurous young girl with messy purple hair, pink skin, large brown eyes, and expressive eyebrows. She wears a pink baseball cap backward, a pink-and-red striped shirt, a purple backpack, dark purple trousers, and sturdy yellow boots.",
+  "visual_reference": "characters/mila/visual-reference.md",
+  "omnichar_artifact": null,
+  "voice": {
+    "provider": "piper",
+    "voice_id": "en_US-ljspeech-high",
+    "style_notes": "Clear, curious, unhurried narration"
+  },
+  "personality": ["curious", "brave", "careful"],
+  "wardrobe": ["pink cap worn backward", "pink-and-red striped shirt", "purple backpack", "dark purple trousers", "yellow boots"],
+  "allowed_styles": ["cartoon"],
+  "consistency": {
+    "lock_face": true,
+    "lock_palette": true,
+    "max_drift_score": 10
+  },
+  "version": "1.0.0",
+  "created_at": "2026-10-12T00:00:00.000Z",
+  "updated_at": "2026-10-12T00:00:00.000Z"
+}

@@ -6,7 +6,7 @@ describe("character registry", () => {
     const registry = new FileCharacterRegistry("characters");
     const list = await registry.list();
     const ids = list.map((c) => c.character_id).sort();
-    expect(ids).toEqual(["bolt", "max", "milo"]);
+    expect(ids).toEqual(["bolt", "max", "mila", "milo", "milo-monkey"]);
   });
 
   it("resolves preferred characters for a story", async () => {

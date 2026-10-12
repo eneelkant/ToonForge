@@ -30,6 +30,26 @@ export const ChannelConfigSchema = z.object({
    * sentences as the scene beats instead of the generic template.
    */
   episode_concept: z.string().min(1).max(500).optional(),
+  /** YouTube channel id this config is allowed to publish to. */
+  youtube_channel_id: z.string().regex(/^UC[A-Za-z0-9_-]{22}$/).optional(),
+  /** Path to a sourced history episode. Required for the Mila and Milo long-form channel. */
+  history_episode: z.string().min(1).optional(),
+}).superRefine((channel, ctx) => {
+  if (channel.format !== "long_form") return;
+  if (channel.duration_seconds < 300 || channel.duration_seconds > 600) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "long_form duration_seconds must be from 300 to 600",
+      path: ["duration_seconds"],
+    });
+  }
+  if (!channel.history_episode) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "long_form channels require history_episode so they cannot fall back to the short cartoon template",
+      path: ["history_episode"],
+    });
+  }
 });
 
 export type ChannelConfig = z.infer<typeof ChannelConfigSchema>;
